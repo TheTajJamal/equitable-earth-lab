@@ -110,8 +110,7 @@
     if (!L.goal) { t.innerHTML = flash || '<span class="tk-goal">ALL GOALS PLAYED</span>'; return; }
     const G = L.goal, d = prevBar == null ? 0 : L.bar - prevBar;
     t.innerHTML = `${flash}<span class="tk-idx">GOAL ${G.idx}/5</span><span class="tk-goal">${G.title}</span>
-      ${barHTML(L.bar)}<span class="tk-pts"><b>${L.bar}</b>/10 ${d ? `<em class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '&#9650;' : '&#9660;'}${Math.abs(d)}</em>` : ''} &middot; NEED ${LL.LINE}</span>
-      <span class="tk-base">KIDS LIKE YOU: ${G.base}%</span>`;
+      ${barHTML(L.bar)}<span class="tk-pts"><b>${L.bar}</b>/10 ${d ? `<em class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '&#9650;' : '&#9660;'}${Math.abs(d)}</em>` : ''}</span>`;
   }
   function hud() {
     $('hud').hidden = !L;
@@ -145,6 +144,21 @@
     window.scrollTo({ top: 0 });
   }
 
+  // Show one event per screen; the question, choices and WHY? arrive on the last screen.
+  function present(lines, cards, finalize) {
+    const main = lines.filter(l => l.tone !== 'q'), qs = lines.filter(l => l.tone === 'q');
+    const pages = main.length ? main.map(l => [l]) : [[]];
+    pages[pages.length - 1].push(...qs);
+    let i = 0;
+    const show = () => {
+      if (i < pages.length - 1) {
+        say(pages[i]);
+        choices([['NEXT', `${i + 1} of ${pages.length}`, () => { i++; show(); }, true]]);
+      } else { say(pages[i], cards); finalize(); }
+    };
+    show();
+  }
+
   function step(focus, answer) {
     choiceLog.push(focus ?? null);
     const prev = L.bar;
@@ -152,30 +166,32 @@
     const lines = LL.advance(L, focus, answer);
     hud();
     ticker(prev);
-    if (L.done) { say(lines, L.cards); finish(); return; }
+    if (L.done) { present(lines, L.cards, finish); return; }
     const out = lines.length ? lines : [{ text: 'Life goes on.' }];
     if (L.pending) {
       const P = L.pending;
       if (P.q) out.push({ text: P.q, tone: 'q' });
-      say(out, L.cards);
-      if (P.key === 'path') choices(P.options.map(([k, label, sub], i) => [label, sub, () => { pathAnswer = k; step('steady', k); }, i === 0]));
-      else choices(P.options.map(([k, label, sub]) => [label, sub, () => step('steady', 'go'), true]));
+      present(out, L.cards, () => {
+        if (P.key === 'path') choices(P.options.map(([k, label, sub], i) => [label, sub, () => { pathAnswer = k; step('steady', k); }, i === 0]));
+        else choices(P.options.map(([k, label, sub]) => [label, sub, () => step('steady', 'go'), true]));
+      });
       return;
     }
-    if (L.age < 17) { say(out, L.cards); choices([['KEEP GOING', null, () => step(null), true]]); return; }
+    if (L.age < 17) { present(out, L.cards, () => choices([['KEEP GOING', null, () => step(null), true]])); return; }
     const next = LL.TURNS[L.turn + 1];
     out.push({ text: `How do you spend the next ${next.age - L.age} years?`, tone: 'q' });
-    say(out, L.cards);
     const q = LL.dreamFor(L);
     const goFor = q ? [[q.tries ? 'TRY AGAIN' : 'GO FOR IT', `${q.dream} +1 if it works: about ${Math.round(q.odds * 100)}% chance${q.tries ? ', better than last time' : ''}.`, () => step('dream'), true]] : [];
-    if (L.scene === 'jail') { choices([...goFor, ['SERVE YOUR TIME', null, () => step('steady'), !q]]); return; }
     const lowKids = L.kids.length && L.pct < 40;
-    choices([
-      ...goFor,
-      [L.edu === 'college' ? 'STUDY HARD' : 'TAKE NIGHT CLASSES', 'Half the time: +1.', () => step('study'), !q],
-      ['PICK UP EXTRA SHIFTS', lowKids ? '+1, but your family pays for it: -1.' : '+1, with a chance of burnout: -1.', () => step('hustle')],
-      ['REST AND SEE FAMILY', 'Setbacks are half as likely this round.', () => step('rest')],
-    ]);
+    present(out, L.cards, () => {
+      if (L.scene === 'jail') { choices([...goFor, ['SERVE YOUR TIME', null, () => step('steady'), !q]]); return; }
+      choices([
+        ...goFor,
+        [L.edu === 'college' ? 'STUDY HARD' : 'TAKE NIGHT CLASSES', 'Half the time: +1.', () => step('study'), !q],
+        ['PICK UP EXTRA SHIFTS', lowKids ? '+1, but your family pays for it: -1.' : '+1, with a chance of burnout: -1.', () => step('hustle')],
+        ['REST AND SEE FAMILY', 'Setbacks are half as likely this round.', () => step('rest')],
+      ]);
+    });
   }
 
   // ---------- ending ----------
