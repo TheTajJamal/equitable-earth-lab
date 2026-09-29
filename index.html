@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Equitable Earth Lab</title>
+<meta name="description" content="Small interactive tools about fairness, opportunity and climate, built on real data. By Equitable Earth Solutions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* Layout: a single column "cartridge shelf": title, one line of purpose, then a stack of tool cards. */
+:root{
+  --night:#1b1830; --panel:#26213f; --edge:#4a3f73; --paper:#f1e7d0; --dim:#b3a8c9; --amber:#f2a541; --good:#5cc8a6;
+  --pixel:"Press Start 2P", ui-monospace, monospace; --type:"VT323", ui-monospace, monospace; color-scheme: dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--paper);font-family:var(--type);font-size:22px;line-height:1.2}
+.wrap{max-width:640px;margin:0 auto;padding-inline:16px;padding-block:40px 48px;display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--pixel);font-size:18px;line-height:1.6;margin:0;color:var(--amber);text-wrap:balance}
+.lede{margin:0;max-width:34ch;color:var(--paper)}
+.shelf{display:flex;flex-direction:column;gap:16px}
+.cart{display:grid;grid-template-columns:72px 1fr;gap:14px;align-items:center;background:var(--panel);border:3px solid var(--edge);padding:14px;color:inherit;text-decoration:none}
+a.cart:hover,a.cart:focus-visible{border-color:var(--amber);outline:none}
+.cart canvas{width:72px;height:72px;image-rendering:pixelated;background:#000;border:2px solid var(--edge)}
+.cart h2{font-family:var(--pixel);font-size:11px;margin:0 0 8px;letter-spacing:.5px}
+.cart p{margin:0;color:var(--dim)}
+.tag{font-family:var(--pixel);font-size:7px;letter-spacing:.5px;color:var(--good);margin-top:8px;display:block}
+.cart.soon{opacity:.6}
+.cart.soon .tag{color:var(--dim)}
+footer{font-family:var(--pixel);font-size:8px;color:var(--dim);line-height:2}
+footer a{color:var(--paper)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EQUITABLE EARTH LAB</h1>
+  <p class="lede">Small games and tools about fairness and opportunity, built on real data.</p>
+  <div class="shelf">
+    <a class="cart" href="life-lottery/">
+      <canvas width="18" height="18" data-icon="ladder" aria-hidden="true"></canvas>
+      <div><h2>LIFE LOTTERY</h2><p>Draw a random American life. Try to reach five goals. The odds come from data on 20 million people.</p><span class="tag">PLAY NOW &middot; USA</span></div>
+    </a>
+    <div class="cart soon">
+      <canvas width="18" height="18" data-icon="flag" aria-hidden="true"></canvas>
+      <div><h2>LIFE LOTTERY: SWEDEN</h2><p>The same life, drawn in a different country.</p><span class="tag">IN DEVELOPMENT</span></div>
+    </div>
+  </div>
+  <footer>BY <a href="https://equitableearth.solutions">EQUITABLE EARTH SOLUTIONS</a></footer>
+</div>
+<script>
+document.querySelectorAll('canvas[data-icon]').forEach(c => {
+  const g = c.getContext('2d'), p = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  p(0, 0, 18, 18, '#2b2451');
+  if (c.dataset.icon === 'ladder') { p(4, 2, 1, 14, '#f2a541'); p(12, 2, 1, 14, '#f2a541'); for (let y = 4; y < 16; y += 3) p(4, y, 9, 1, '#f2a541'); p(7, 11, 3, 3, '#f1e7d0'); p(8, 9, 1, 2, '#f1e7d0'); }
+  else { p(3, 5, 12, 8, '#3a6fb0'); p(3, 8, 12, 2, '#f2c230'); p(6, 5, 2, 8, '#f2c230'); }
+});
+</script>
+</body>
+</html>

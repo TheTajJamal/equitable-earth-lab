@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Life Lottery</title>
+<meta name="description" content="Draw a random American life and see how far you get. Every odd comes from real US mobility data. An Equitable Earth Lab tool.">
+<meta property="og:title" content="Life Lottery">
+<meta property="og:description" content="Draw a random American life. The odds are real.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow game column, like a handheld: HUD, scene, dialog box, choices, goals. Single dark theme on purpose. */
+:root{
+  --night:#1b1830; --panel:#26213f; --edge:#4a3f73; --paper:#f1e7d0; --dim:#b3a8c9;
+  --amber:#f2a541; --good:#5cc8a6; --bad:#ec6a5e;
+  --pixel:"Press Start 2P", ui-monospace, monospace; --type:"VT323", ui-monospace, monospace;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--night);color:var(--paper);font-family:var(--type);font-size:21px;line-height:1.15;-webkit-font-smoothing:none}
+.wrap{max-width:520px;margin:0 auto;padding-inline:16px;padding-block:12px 32px;display:flex;flex-direction:column;gap:12px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+header h1{font-family:var(--pixel);font-size:14px;letter-spacing:1px;margin:0;color:var(--amber)}
+header a{font-family:var(--pixel);font-size:8px;color:var(--dim);text-decoration:none;letter-spacing:.5px}
+header a:hover,header a:focus-visible{color:var(--paper)}
+.hud{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--dim)}
+.hud b{color:var(--paper);font-weight:400}
+.hearts{display:flex;gap:3px}
+.heart{width:12px;height:11px;background:var(--bad);clip-path:polygon(0 18%,18% 0,40% 0,50% 18%,60% 0,82% 0,100% 18%,100% 45%,50% 100%,0 45%)}
+.heart.off{background:var(--edge)}
+.screen{position:relative;border:4px solid var(--edge);background:#000;box-shadow:0 0 0 4px var(--night),0 0 0 8px var(--panel)}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;aspect-ratio:160/96;max-width:100%}
+.agetag{position:absolute;top:6px;left:6px;font-family:var(--pixel);font-size:8px;background:rgba(0,0,0,.55);padding:4px 5px;color:var(--paper)}
+.dialog{background:var(--panel);border:4px solid var(--paper);box-shadow:inset 0 0 0 3px var(--night);padding:12px 14px;min-height:130px;display:flex;flex-direction:column;gap:8px}
+.dialog p{margin:0}
+.dialog p.good{color:var(--good)} .dialog p.bad{color:var(--bad)}
+.dialog .q{color:var(--amber)}
+.choices{display:flex;flex-direction:column;gap:8px}
+.btn{font-family:var(--pixel);font-size:11px;letter-spacing:.5px;text-align:left;background:var(--night);color:var(--paper);border:3px solid var(--paper);padding:13px 14px;cursor:pointer;display:flex;gap:10px;align-items:center;min-height:48px;width:100%}
+.btn .cur{visibility:hidden;color:var(--amber)}
+.btn:hover .cur,.btn:focus-visible .cur{visibility:visible;animation:blink .8s steps(1) infinite}
+.btn:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.btn small{display:block;font-family:var(--type);font-size:18px;letter-spacing:0;color:var(--dim);margin-top:4px}
+.btn.primary{background:var(--amber);color:var(--night);border-color:var(--amber)}
+.btn.primary .cur{color:var(--night)}
+.btn.primary small{color:var(--night);opacity:.8}
+@keyframes blink{50%{visibility:hidden}}
+.goals{display:grid;grid-template-columns:1fr;gap:4px;font-family:var(--pixel);font-size:8px;letter-spacing:.5px;color:var(--dim);border-top:3px dashed var(--edge);padding-top:10px}
+.goal{display:flex;gap:8px;align-items:center}
+.goal i{font-style:normal;width:14px;height:14px;border:2px solid var(--dim);display:inline-grid;place-items:center;font-size:8px;flex:none}
+.goal.won{color:var(--good)} .goal.won i{border-color:var(--good);background:var(--good);color:var(--night)}
+.goal.lost{color:var(--bad);text-decoration:line-through} .goal.lost i{border-color:var(--bad)}
+.panel{background:var(--panel);border:3px solid var(--edge);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.panel h2{font-family:var(--pixel);font-size:10px;letter-spacing:.5px;margin:0;color:var(--amber);line-height:1.5}
+.panel p{margin:0}
+label.f{display:flex;flex-direction:column;gap:4px;font-family:var(--pixel);font-size:8px;color:var(--dim)}
+select{font-family:var(--type);font-size:22px;background:var(--night);color:var(--paper);border:3px solid var(--paper);padding:6px 8px;border-radius:0}
+.odds{width:100%;border-collapse:collapse;font-size:19px;font-variant-numeric:tabular-nums}
+.odds th{font-family:var(--pixel);font-size:7px;color:var(--dim);font-weight:400;text-align:right;padding:4px 3px;vertical-align:bottom}
+.odds th:first-child,.odds td:first-child{text-align:left}
+.odds td{text-align:right;padding:3px 3px;border-top:1px solid var(--edge)}
+.odds tr.you td{color:var(--amber)}
+.scroll{overflow-x:auto}
+.bar{height:10px;background:var(--edge);position:relative}
+.bar span{position:absolute;inset:0 auto 0 0;background:var(--amber)}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.compare>div{min-width:0;border:3px solid var(--edge);padding:8px;display:flex;flex-direction:column;gap:4px}
+.compare h3{font-family:var(--pixel);font-size:8px;margin:0;color:var(--dim);line-height:1.5}
+.sources{font-size:18px;color:var(--dim)} .sources a{color:var(--paper)}
+.sources li{margin-bottom:4px}
+footer{font-family:var(--pixel);font-size:7px;color:var(--dim);text-align:center;line-height:1.8}
+footer a{color:var(--dim)}
+@media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>LIFE LOTTERY</h1>
+    <a href="../">EQUITABLE EARTH LAB</a>
+  </header>
+  <div class="hud" id="hud" hidden>
+    <span>AGE <b id="hAge">0</b></span>
+    <span>INCOME <b id="hPct">-</b></span>
+    <span class="hearts" id="hHearts" aria-label="Wellbeing"></span>
+  </div>
+  <div class="screen">
+    <canvas id="cv" width="160" height="96" aria-label="Pixel scene of your character"></canvas>
+    <div class="agetag" id="tag">USA</div>
+  </div>
+  <div class="dialog" id="dialog" aria-live="polite"></div>
+  <div class="choices" id="choices"></div>
+  <div class="goals" id="goals" hidden></div>
+  <div id="extra"></div>
+  <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>AN <a href="https://equitableearth.solutions">EQUITABLE EARTH</a> TOOL</footer>
+</div>
+<script src="data-us.js"></script>
+<script src="engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
