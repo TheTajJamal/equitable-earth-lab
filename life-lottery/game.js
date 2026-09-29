@@ -87,6 +87,17 @@
     else if (L.age < 14) drawSprite('kid', 72, 50 + bob, pal, step);
     else if (sc === 'end' && !L.goals.live65) { /* early death: an empty bench-less field, headstone only */ }
     else drawSprite(L.gender === 'f' ? 'adult_f' : 'adult_m', sc === 'end' ? 103 : 72, sc === 'end' ? 38 : 42, pal, sc === 'end' ? false : step);
+    // family: partner and kids stand with you
+    if (L.age >= 20 && sc !== 'jail' && sc !== 'end') {
+      if (L.partner) {
+        const pg = LL.hash(L.seed + '|pg') < .5 ? 'adult_f' : 'adult_m';
+        const races = Object.keys(SKIN), pr = races[Math.floor(LL.hash(L.seed + '|pr') * races.length * 1.6) % races.length];
+        const pr2 = LL.hash(L.seed + '|same') < .8 ? L.race : pr;
+        drawSprite(pg, 96, 42, { ...pal, s: SKIN[pr2][1], h: HAIR[pr2][0], c: '#5cc8a6', p: '#2f3558' }, !step);
+      }
+      if (L.kids >= 1) drawSprite('kid', 54, 50, { ...pal, c: '#f2a541', p: '#3a4a6b' }, step);
+      if (L.kids >= 2) drawSprite('kid', 118, 50, { ...pal, c: '#ec6a5e', p: '#3a4a6b' }, !step);
+    }
   }
 
   function home(pq) {
@@ -123,6 +134,7 @@
     if (!L) return;
     $('hAge').textContent = L.age;
     $('hPct').textContent = L.age < 18 ? 'PARENTS ' + LL.ord(L.parentPct) : L.edu === 'college' ? 'STUDENT' : L.scene === 'jail' ? 'NONE' : LL.ord(L.pct);
+    $('hWins').textContent = L.wins.length;
     $('hHearts').innerHTML = [0, 1, 2, 3, 4].map(i => `<span class="heart ${i < L.hearts ? '' : 'off'}"></span>`).join('');
     $('tag').textContent = L.scene === 'end' ? 'EPILOGUE' : 'AGE ' + L.age;
     const gl = $('goals'); gl.hidden = false;
@@ -182,8 +194,11 @@
     const next = LL.AGES[L.turn + 1];
     say([...(lines.length ? lines : [{ text: 'Life goes on.' }]), { text: `How do you spend the next ${next - L.age} years?`, tone: 'q' }]);
     const inJail = L.scene === 'jail';
-    choices(inJail ? [['SERVE YOUR TIME', null, () => step('steady'), true]] : [
-      [L.edu === 'college' ? 'STUDY HARD' : 'TAKE NIGHT CLASSES', 'Small boost to your prospects.', () => step('study'), true],
+    const q = LL.questFor(L);
+    const goFor = q ? [[q.tries ? 'TRY AGAIN' : 'GO FOR IT', `${q.dream} About ${Math.round(q.odds * 100)}% chance${q.tries ? ', better than last time' : ''}.`, () => step('quest'), true]] : [];
+    choices(inJail ? [...goFor, ['SERVE YOUR TIME', null, () => step('steady'), !q]] : [
+      ...goFor,
+      [L.edu === 'college' ? 'STUDY HARD' : 'TAKE NIGHT CLASSES', 'Small boost to your prospects.', () => step('study'), !q],
       ['PICK UP EXTRA SHIFTS', 'Bigger push, but costs a heart.', () => step('hustle')],
       ['REST AND SEE FAMILY', 'Recover a heart. Fewer setbacks.', () => step('rest')],
     ]);
@@ -192,8 +207,10 @@
   // ---------- ending ----------
   function finish() {
     const n = Object.values(L.goals).filter(v => v != null).length;
+    const parentAt = Math.round(L.pct);
     choices([
-      ['DRAW ANOTHER LIFE', null, () => start({}), true],
+      ...(L.kids ? [['PLAY AS YOUR CHILD', `Their life starts where yours got to: the ${LL.ord(parentAt)} percentile.`, () => start({ race: L.race, parentPct: parentAt, cohort: L.cohort }), true]] : []),
+      ['DRAW ANOTHER LIFE', null, () => start({}), !L.kids],
       ['CHOOSE YOUR START', 'Pick race, gender, family income and generation.', chooser],
     ]);
     const fixed = { race: L.race, gender: L.gender, cohort: L.cohort };
@@ -208,7 +225,11 @@
     const pctf = x => Math.round(x * 100) + '%';
     $('extra').innerHTML = `
       <div class="panel">
-        <h2>YOU MET ${n} OF 5 GOALS</h2>
+        <h2>WHAT YOU BUILT: &#9733; ${L.wins.length}</h2>
+        ${L.wins.length ? `<ul class="wins">${[...L.wins].sort((x, y) => x.age - y.age).map(w => `<li><span>${w.age}</span>${w.text}</li>`).join('')}</ul>` : '<p>A hard life. You kept going.</p>'}
+      </div>
+      <div class="panel">
+        <h2>YOU MET ${n} OF 5 BIG GOALS</h2>
         <p>Your household income at 35 was the ${LL.ord(L.pct)} percentile. Your parents were at the ${LL.ord(L.parentPct)}.</p>
       </div>
       <div class="panel">

@@ -1,4 +1,4 @@
-# Equitable Earth Lab
+# Equitable Earth Solutions Lab
 
 Small interactive tools about fairness and opportunity, built on real data. By [Equitable Earth Solutions](https://equitableearth.solutions).
 
@@ -13,6 +13,10 @@ Draw a random American life and try to reach five goals:
 3. Get out of the bottom 40% of household income by 35
 4. Out-earn your parents
 5. Live to retirement age (65)
+
+Along the way, each adult stage offers an "If I can just..." goal (a certification, a better job, your own apartment). Missed goals can be retried with better odds, and life brings partners, kids and friends. These show up as small wins (★). Going for them every time raises the chance of leaving the bottom 40% by roughly 7–10 percentage points, so effort helps, but birth still matters more.
+
+When a life with children ends, you can play as your child, starting from the income percentile you reached.
 
 Births are weighted like real US births (race, gender, and parents' income). The data sets the odds of each outcome for someone born where you were. Player choices (study, extra shifts, rest) shift those odds slightly. Everyday setbacks in the story text are illustrative.
 
@@ -35,7 +39,8 @@ All Opportunity Insights data: https://opportunityinsights.org/data/
 - Finishing a degree uses the Pell ratio (bachelor's by 24 ÷ enrollment) for all groups.
 - Incarceration uses the share incarcerated on one day around ages 27–32, so it understates lifetime incarceration. Not published for Hispanic, Asian or American Indian children, so the event does not occur for those groups.
 - Death age uses a Gompertz curve fitted to each person's life expectancy at 40.
-- Choices shift the latent draw by at most about 0.4 standard deviations over a whole life.
+- Choices shift the latent draw by at most about 0.4 standard deviations over a whole life, and achieved "If I can just..." goals add up to 5 income percentiles.
+- Partner odds use the Opportunity Insights marriage rates (Black and white children; 45% otherwise) plus 20 points for cohabiting. Children and everyday joys are illustrative.
 
 ## Structure
 

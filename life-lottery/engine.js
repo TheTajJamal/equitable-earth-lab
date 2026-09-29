@@ -91,7 +91,7 @@
       z: PhiInv(R('fortune')), effort: 0, hearts: b.parentPct <= 20 ? 3 : b.parentPct <= 60 ? 4 : 5,
       turn: 0, age: 0, pct: b.parentPct, edu: 'school', jailed: false, jailAge: null,
       goals: { college: null, degree: null, middle: null, outearn: null, live65: null },
-      log: [], done: false, pending: null, tone: 'neutral', scene: 'home',
+      log: [], done: false, pending: null, tone: 'neutral', scene: 'home', wins: [], partner: false, kids: 0, bump: 0, questTries: {},
       tones: { skin: Math.floor(R('skin') * 3), hair: Math.floor(R('hair') * 3) },
     };
     L.within = R('within');
@@ -127,6 +127,76 @@
   }
   function ord(n) { n = Math.round(n); const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
+  // "If I can just..." goals: small, concrete, retryable. Odds rise with each try.
+  const QUESTS = {
+    ged: { dream: 'If I can just get my GED while I am inside, I will have something to show when I get out.', win: 'Earned a GED', p: .55, boost: .04, bump: 1 },
+    orgo: { dream: 'If I can just pass this one class that everyone fails, I can stay in my major.', win: 'Passed the class everyone fails', p: .55, boost: .05, bump: 0 },
+    forklift: { dream: 'If I can just get my forklift certification, I can get off the night shift.', win: 'Got forklift certified', p: .6, boost: .03, bump: 2 },
+    cushion: { dream: 'If I can just save $1,000, one bad month will not sink me.', win: 'Saved a $1,000 cushion', p: .45, boost: .02, bump: 0 },
+    cdl: { dream: 'If I can just get my CDL, trucking pays $20,000 more a year.', win: 'Got a commercial driver\'s license', p: .45, boost: .05, bump: 4 },
+    permanent: { dream: 'If I can just get hired on permanent instead of temp, I get health insurance.', win: 'Hired on permanent, with benefits', p: .5, boost: .04, bump: 3 },
+    apartment: { dream: 'If I can just get a place of my own, I can finally breathe.', win: 'Moved into my own apartment', p: .5, boost: .02, bump: 0 },
+    lead: { dream: 'If I can just get the shift lead job, the raise covers daycare.', win: 'Promoted to shift lead', p: .5, boost: .04, bump: 3 },
+    apprentice: { dream: 'If I can just get into the union apprenticeship, I will have a trade for life.', win: 'Got into a union apprenticeship', p: .4, boost: .06, bump: 4 },
+    associate: { dream: 'If I can just finish my associate degree at night, doors open.', win: 'Finished an associate degree', p: .45, boost: .06, bump: 3 },
+    debt: { dream: 'If I can just pay off this credit card, I can start saving.', win: 'Paid off the credit card', p: .55, boost: .02, bump: 0 },
+    newjob: { dream: 'If I can just land a job that pays more, everything gets easier.', win: 'Landed a better-paying job', p: .45, boost: .05, bump: 4 },
+    house: { dream: 'If I can just save a down payment, we can buy a house.', win: 'Bought a first home', p: .5, boost: .03, bump: 0 },
+    director: { dream: 'If I can just get the director role, I will be the one making decisions.', win: 'Promoted to director', p: .4, boost: .05, bump: 3 },
+  };
+  function questFor(L) {
+    const done = id => L.wins.some(w => w.id === id);
+    let list;
+    if (L.scene === 'jail') list = ['ged'];
+    else if (L.edu === 'college') list = ['orgo'];
+    else if (L.pct < 35) list = ['forklift', 'cushion', 'permanent', 'apartment', 'cdl', 'newjob'];
+    else if (L.pct < 70) list = ['lead', 'debt', 'apprentice', 'associate', 'newjob', 'house'];
+    else list = ['house', 'director', 'newjob'];
+    const open = list.filter(id => !done(id));
+    if (!open.length) return null;
+    // keep offering the same unfinished dream until it is reached
+    const id = open.includes(L.lastQuest) ? L.lastQuest : open[Math.floor(hash(L.seed + '|q|' + L.turn) * open.length)];
+    const tries = L.questTries[id] || 0;
+    return { id, ...QUESTS[id], tries, odds: Math.min(.85, QUESTS[id].p + .15 * tries) };
+  }
+  function resolveQuest(L, q, say, a) {
+    if (!q) return;
+    L.lastQuest = q.id;
+    if (hash(L.seed + '|qr|' + q.id + '|' + q.tries) < q.odds) {
+      L.wins.push({ id: q.id, age: a, text: q.win });
+      L.hearts = Math.min(5, L.hearts + 1); L.effort += q.boost * .5; L.bump = Math.min(5, L.bump + q.bump);
+      say(`&#9733; ${q.win}. ${q.tries ? 'It took ' + (q.tries + 1) + ' tries. ' : ''}You did it.`, 'good');
+    } else {
+      L.questTries[q.id] = q.tries + 1;
+      say(pick(hash(L.seed + '|qf|' + a), ['Not this time. You are closer than you were.', 'You come up short, but now you know what it takes.', 'It does not work out yet. You will try again.']));
+    }
+  }
+  const KID = ['daughter', 'son'];
+  function pMarried(race, pp) {
+    return race === 'white' || race === 'black' ? interp(D().pcts, D().married[race], pp) / 100 : .45;
+  }
+  // Good things that happen in most lives, at every income
+  function joys(L, say, a) {
+    const R = k => hash(L.seed + '|' + L.turn + '|joy|' + k);
+    let any = false;
+    const pm = pMarried(L.race, L.parentPct);
+    if (!L.partner && a >= 22 && a <= 32 && R('partner') < 1 - Math.pow(1 - Math.min(.9, pm + .2), 1 / 5)) {
+      L.partner = true; any = true; L.hearts = Math.min(5, L.hearts + 1);
+      L.wins.push({ id: 'partner', age: a, text: 'Found a partner' });
+      say(pick(R('pw'), ['&#9733; You meet someone at a friend\'s cookout. A year later you move in together.', '&#9733; You fall in love. For the first time in a while, you are not doing this alone.', '&#9733; You get married in your aunt\'s backyard. Everyone dances.']), 'good');
+    }
+    if (L.kids < 2 && a >= 20 && a <= 34 && R('kid') < (L.kids ? .2 : .24)) {
+      const k = KID[Math.floor(R('kidg') * 2)];
+      L.kids++; any = true; L.hearts = Math.min(5, L.hearts + 1);
+      L.wins.push({ id: 'kid' + L.kids, age: a, text: L.kids === 1 ? `First child born` : `Second child born` });
+      say(`&#9733; Your ${k} is born. You hold ${k === 'son' ? 'him' : 'her'} and everything feels possible.`, 'good');
+    } else if (L.kids && R('kidm') < .35) {
+      any = true;
+      say(pick(R('kmw'), ['Your kid learns to ride a bike in the parking lot. You run alongside the whole way.', 'Your kid brings home a perfect spelling test. It goes on the fridge.', 'Your kid\'s teacher calls to say how kind they are to the other kids.', 'You make it to every one of your kid\'s games this season.']), 'good');
+    }
+    if (!any && R('small') < .3) say(pick(R('smw'), ['A coworker becomes your closest friend.', 'Your family gets together for a birthday and nobody fights.', 'You find a church, a gym, a crew. People who show up for you.', 'Your mom gets good news from the doctor.']), 'good');
+  }
+
   // Apply a focus choice for the period just lived
   function applyFocus(L, focus) {
     if (!focus) return;
@@ -143,10 +213,12 @@
     const R = k => hash(L.seed + '|' + L.turn + '|' + k);
     const prevAge = L.age;
     applyFocus(L, focus);
+    const quest = focus === 'quest' && L.age >= 18 && L.age < 35 ? questFor(L) : null;
     L.turn++;
     L.age = AGES[L.turn] ?? 36;
     const a = L.age;
     const pp = L.parentPct, low = pp <= 40, mid = pp > 40 && pp <= 80;
+    resolveQuest(L, quest, say, a);
 
     // shared, illustrative hardships (flavor; odds rise at lower incomes)
     function hardship() {
@@ -224,16 +296,17 @@
         L.scene = 'work';
         hardship();
       }
+      if (L.scene !== 'jail' && a >= 20) joys(L, say, a);
       // income path
       const dest = destinyPct(L);
       const w = clamp((a - 18) / 14, 0, 1);
-      L.pct = clamp(pp * (1 - w) * .5 + dest * (1 - (1 - w) * .5) + (hash(L.seed + '|n|' + a) - .5) * 8, 1, 99);
+      L.pct = clamp(pp * (1 - w) * .5 + dest * (1 - (1 - w) * .5) + (hash(L.seed + '|n|' + a) - .5) * 8 + L.bump, 1, 99);
       if (L.edu === 'college') L.pct = Math.min(L.pct, 25);
       if (L.hearts <= 0 && L.scene !== 'jail') { L.effort -= .05; L.hearts = 1; say('Burnout. You miss weeks of work and your health takes a hit.', 'bad'); }
       if (a === 35) {
-        L.pct = dest;
-        L.goals.middle = dest > 40 ? 35 : null;
-        say(`At 35 your household income is about $${Math.round(dollars(dest) / 1000)}k, the ${ord(dest)} percentile.`, dest > 40 ? 'good' : 'bad');
+        L.pct = clamp(dest + L.bump, 1, 99);
+        L.goals.middle = L.pct > 40 ? 35 : null;
+        say(`At 35 your household income is about $${Math.round(dollars(L.pct) / 1000)}k, the ${ord(L.pct)} percentile.`, L.pct > 40 ? 'good' : 'bad');
         if (corr(L, 'outearn', RHO.outearn) > 1 - pOutEarn(L.cohort, pp)) { L.goals.outearn = 35; say('You earn more than your parents did at your age.', 'good'); }
         else say('You earn less than your parents did at your age.', 'bad');
         L.pending = { key: 'epilogue', q: 'The rest of your life plays out.', options: [['go', 'Fast-forward']] };
@@ -246,6 +319,7 @@
       L.deathAge = Math.max(36, d);
       if (d >= 65) { L.goals.live65 = 65; say(`You retire${L.pct > 60 ? ' comfortably' : L.pct > 30 ? '' : ' late, with little saved'}. You live to ${L.deathAge}.`, 'good'); }
       else say(`Your health fails in your ${Math.floor(L.deathAge / 10) * 10}s. You die at ${L.deathAge}, before you could retire.`, 'bad');
+      if (L.kids) say(`Your ${L.kids > 1 ? 'kids carry' : 'kid carries'} what you built into the next generation. Their draw starts at the ${ord(L.pct)} percentile.`, 'good');
       L.lifeExp = le;
       L.done = true; L.scene = 'end';
     }
@@ -273,5 +347,5 @@
     return c;
   }
 
-  root.LL = { newLife, advance, simulate, odds, describeBirth, dollars, ord, RACES, pCollege, pJail, pOutEarn, le40, AGES, destinyPct, hash };
+  root.LL = { newLife, advance, simulate, odds, describeBirth, dollars, ord, RACES, pCollege, pJail, pOutEarn, le40, AGES, destinyPct, hash, questFor };
 })(typeof window !== 'undefined' ? window : globalThis);

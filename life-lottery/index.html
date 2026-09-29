@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Life Lottery</title>
-<meta name="description" content="Draw a random American life and see how far you get. Every odd comes from real US mobility data. An Equitable Earth Lab tool.">
+<meta name="description" content="Draw a random American life and see how far you get. Every odd comes from real US mobility data. An Equitable Earth Solutions tool.">
 <meta property="og:title" content="Life Lottery">
 <meta property="og:description" content="Draw a random American life. The odds are real.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,8 +26,12 @@ header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 header h1{font-family:var(--pixel);font-size:14px;letter-spacing:1px;margin:0;color:var(--amber)}
 header a{font-family:var(--pixel);font-size:8px;color:var(--dim);text-decoration:none;letter-spacing:.5px}
 header a:hover,header a:focus-visible{color:var(--paper)}
-.hud{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--dim)}
+.hud{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--dim)}
 .hud b{color:var(--paper);font-weight:400}
+.wincount{color:var(--amber)} .wincount b{color:var(--amber)}
+.wins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.wins li{display:flex;gap:10px;color:var(--good)}
+.wins li span{font-family:var(--pixel);font-size:8px;color:var(--dim);min-width:22px;padding-top:5px}
 .hearts{display:flex;gap:3px}
 .heart{width:12px;height:11px;background:var(--bad);clip-path:polygon(0 18%,18% 0,40% 0,50% 18%,60% 0,82% 0,100% 18%,100% 45%,50% 100%,0 45%)}
 .heart.off{background:var(--edge)}
@@ -80,11 +84,12 @@ footer a{color:var(--dim)}
 <div class="wrap">
   <header>
     <h1>LIFE LOTTERY</h1>
-    <a href="../">EQUITABLE EARTH LAB</a>
+    <a href="../">EQUITABLE EARTH SOLUTIONS</a>
   </header>
   <div class="hud" id="hud" hidden>
     <span>AGE <b id="hAge">0</b></span>
     <span>INCOME <b id="hPct">-</b></span>
+    <span class="wincount" aria-label="Small wins">&#9733; <b id="hWins">0</b></span>
     <span class="hearts" id="hHearts" aria-label="Wellbeing"></span>
   </div>
   <div class="screen">
@@ -95,7 +100,7 @@ footer a{color:var(--dim)}
   <div class="choices" id="choices"></div>
   <div class="goals" id="goals" hidden></div>
   <div id="extra"></div>
-  <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>AN <a href="https://equitableearth.solutions">EQUITABLE EARTH</a> TOOL</footer>
+  <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>A TOOL BY <a href="https://equitableearth.solutions">EQUITABLE EARTH SOLUTIONS</a></footer>
 </div>
 <script src="data-us.js"></script>
 <script src="engine.js"></script>
