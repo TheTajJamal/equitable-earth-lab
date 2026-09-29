@@ -1,10 +1,25 @@
-// Life Lottery UI + pixel scenes (v3)
+// Life Lottery v1 (dice): UI + pixel scenes
 (function () {
   const $ = id => document.getElementById(id);
   const cv = $('cv'), g = cv.getContext('2d');
   const W = 160, H = 96;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let L = null, frame = 0, choiceLog = [], pathAnswer = null;
+  const D = window.DICE, DATA = window.US_DATA;
+  let L = null, frame = 0, busy = false;
+
+  // ---------- helpers ----------
+  const ord = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)] || 'th');
+  function dollars(d) {
+    const p = d * 10 - 5, T = DATA.dollars;
+    for (let i = 1; i < T.length; i++) if (p <= T[i][0]) { const [a, va] = T[i - 1], [b, vb] = T[i]; return va + (vb - va) * (p - a) / (b - a); }
+    return T[T.length - 1][1];
+  }
+  const money = v => '$' + (v >= 1000 ? Math.round(v / 1000) + 'K' : Math.round(v));
+  const FIFTHS = ['bottom fifth', 'second fifth', 'middle fifth', 'fourth fifth', 'top fifth'];
+  const fifth = d => Math.ceil(d / 2) - 1;
+  const kidWord = gd => gd === 'f' ? 'girls' : 'boys';
+  const who = (race, gd) => `${D.RACES[race]} ${kidWord(gd)}`;
+  const srcLinks = keys => (keys || []).map(k => `<a href="${D.SRC[k][1]}" target="_blank" rel="noopener">${D.SRC[k][0]}</a>`).join(' &middot; ');
 
   // ---------- pixel art ----------
   const SKIN = { white: ['#f3cfb1', '#e8b894'], asian: ['#efc9a0', '#d9a878'], hisp: ['#d9a36f', '#b98050'], aian: ['#c98e5c', '#a8704a'], black: ['#8d5a3b', '#5e3b26'] };
@@ -24,56 +39,27 @@
       for (let i = 0; i < r.length; i++) { const ch = r[i]; if (ch !== '.') px(x + i * 2, y + j * 2, 2, 2, pal[ch] || '#f0f'); }
     });
   }
-  function palette() {
-    const s = SKIN[L.race][L.tones.skin % 2], h = HAIR[L.race][L.tones.hair % 3];
+  function sceneFor() {
+    const a = L.age;
+    if (L.over) return 'end';
+    if (a < 15 || a === 33 || a === 48) return 'home';
+    if (a === 15) return 'school';
+    if (a <= 20) return L.lp >= 5 ? 'campus' : 'work';
+    return 'work';
+  }
+  function palette(sc) {
+    const s = SKIN[L.race][L.tone % 2], h = HAIR[L.race][L.tone % 3], hi = L.lp >= 6;
     let c = '#4d7fd6', p = '#2f3558';
-    if (L.scene === 'school') c = '#d9544d';
-    if (L.scene === 'campus') c = '#6b4fa8';
-    if (L.scene === 'work') { c = L.pct >= 55 ? '#e8e2d4' : '#f28c28'; p = L.pct >= 55 ? '#2d2f45' : '#3a4a6b'; }
-    if (L.scene === 'jail') { c = '#f07c1e'; p = '#f07c1e'; }
-    if (L.scene === 'end') c = '#9aa7b8';
+    if (sc === 'school') c = '#d9544d';
+    if (sc === 'campus') c = '#6b4fa8';
+    if (sc === 'work') { c = hi ? '#e8e2d4' : '#f28c28'; p = hi ? '#2d2f45' : '#3a4a6b'; }
+    if (sc === 'end') c = '#9aa7b8';
     return { h, s, e: '#1a1418', c, p, b: '#1a1418', w: '#f4f0e6' };
   }
   function sky(top, bottom) { for (let y = 0; y < 70; y++) px(0, y, W, 1, y > 45 ? bottom : y < 35 ? top : (y % 2 ? top : bottom)); }
   function ground(c1, c2) { px(0, 70, W, 26, c1); for (let x = 0; x < W; x += 4) px(x + (frame % 4), 72, 2, 1, c2); }
   function windowGrid(x, y, cols, rows, lit) { for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) px(x + i * 6, y + j * 7, 3, 4, ((i * 7 + j * 3) % 5 < lit) ? '#ffd27a' : '#3a3556'); }
   function cloud(x, y) { px(x, y, 12, 3, '#e8e2f2'); px(x + 3, y - 2, 6, 2, '#e8e2f2'); }
-  function scene() {
-    if (!L) { titleScene(); return; }
-    const sc = L.scene, lived = L.results.live65;
-    sky(sc === 'end' ? '#e98a5b' : sc === 'jail' ? '#4a4a5c' : '#6fa8dc', sc === 'end' ? '#f2c078' : sc === 'jail' ? '#5c5c70' : '#9cc6e8');
-    if (sc !== 'jail') { cloud((frame * .3 + 20) % 190 - 20, 12); cloud((frame * .2 + 110) % 190 - 20, 22); }
-    ground(sc === 'jail' ? '#55525f' : '#4f8a4b', sc === 'jail' ? '#46434f' : '#3f7a3c');
-    if (sc === 'home') home(L.age >= 36 ? Math.min(4, Math.floor(L.pct / 20)) : L.pq);
-    if (sc === 'school') { px(20, 30, 70, 40, '#b5523b'); windowGrid(26, 36, 10, 4, 2); px(48, 56, 12, 14, '#5a3325'); px(95, 20, 1, 50, '#ccc'); px(96, 20, 10, 6, '#d9544d'); px(96, 23, 10, 1, '#fff'); }
-    if (sc === 'campus') { px(12, 34, 84, 36, '#d9d1bd'); px(8, 30, 92, 5, '#c2b89f'); px(30, 18, 48, 12, '#d9d1bd'); for (let i = 0; i < 7; i++) px(18 + i * 11, 38, 4, 32, '#efe8d6'); px(118, 40, 20, 18, '#3e8a4e'); px(126, 58, 4, 12, '#6b4a2b'); }
-    if (sc === 'work') {
-      if (L.pct >= 55) { px(14, 8, 44, 62, '#4a5a7a'); windowGrid(17, 12, 7, 8, 3); px(62, 26, 34, 44, '#5b6b8c'); windowGrid(65, 30, 5, 5, 2); }
-      else { px(8, 36, 96, 34, '#8a8f9c'); for (let i = 0; i < 4; i++) px(14 + i * 22, 48, 16, 22, '#5d6270'); px(8, 32, 96, 4, '#6b707c'); px(20, 26, 40, 6, '#d94f3a'); }
-    }
-    if (sc === 'jail') { px(0, 20, W, 50, '#77737f'); for (let i = 0; i < W; i += 8) px(i, 20, 4, 50, '#8a8693'); px(30, 34, 40, 26, '#2a2833'); for (let i = 0; i < 8; i++) px(32 + i * 5, 34, 2, 26, '#b6b3bd'); }
-    if (sc === 'end') {
-      if (lived) { px(96, 60, 30, 3, '#7a4f2e'); px(98, 63, 2, 7, '#5a3a22'); px(122, 63, 2, 7, '#5a3a22'); px(96, 54, 30, 2, '#7a4f2e'); }
-      else { px(112, 50, 14, 20, '#9a98a6'); px(114, 48, 10, 2, '#9a98a6'); px(118, 54, 2, 8, '#6d6b78'); px(115, 56, 8, 2, '#6d6b78'); }
-    }
-    const pal = palette(), step = !reduced && (frame >> 3) % 2 === 1;
-    if (L.age < 3) drawSprite('baby', 72, 58, pal, false);
-    else if (L.age < 14) drawSprite('kid', 72, 50, pal, step);
-    else if (!(sc === 'end' && !lived)) drawSprite(L.gender === 'f' ? 'adult_f' : 'adult_m', sc === 'end' ? 103 : 72, sc === 'end' ? 38 : 42, pal, sc === 'end' ? false : step);
-    // family stands with you
-    if (L.age >= 20 && sc !== 'jail' && sc !== 'end') {
-      if (L.partner) {
-        const pg = LL.hash(L.seed + '|pg') < .5 ? 'adult_f' : 'adult_m';
-        const races = Object.keys(SKIN), other = races[Math.floor(LL.hash(L.seed + '|pr') * races.length)];
-        const pr = LL.hash(L.seed + '|same') < .8 ? L.race : other;
-        drawSprite(pg, 96, 42, { ...pal, s: SKIN[pr][1], h: HAIR[pr][0], c: '#5cc8a6', p: '#2f3558' }, !step);
-      }
-      L.kids.forEach((k, i) => {
-        const ka = L.age - k.born, x = i ? 124 : 52, kp = { ...pal, c: i ? '#ec6a5e' : '#f2a541', p: '#3a4a6b' };
-        if (ka < 3) drawSprite('baby', x, 58, kp, false); else drawSprite('kid', x, 50, kp, i ? !step : step);
-      });
-    }
-  }
   function home(q) {
     if (q === 0) { px(16, 14, 64, 56, '#8c6e5a'); windowGrid(21, 18, 9, 5, 2); px(16, 52, 64, 18, '#6a8fb0'); px(22, 55, 40, 6, '#e8e2d4'); px(24, 57, 36, 2, '#4a6a8a'); px(66, 56, 10, 14, '#3a3556'); }
     if (q === 1) { px(14, 36, 80, 34, '#c9b48f'); px(10, 28, 88, 8, '#7a4a3a'); windowGrid(20, 42, 3, 2, 1); windowGrid(62, 42, 3, 2, 1); px(46, 50, 10, 20, '#5a3a2e'); px(52, 30, 4, 10, '#8a8a8a'); }
@@ -91,37 +77,54 @@
     windowGrid(12, 44, 3, 3, 2); windowGrid(32, 34, 2, 5, 2); windowGrid(72, 40, 2, 4, 1);
     px(58, 58, 10, 10, '#f1e7d0'); px(60, 60, 2, 2, '#1b1830'); px(64, 64, 2, 2, '#1b1830'); px(62, 62, 2, 2, '#1b1830');
   }
+  function scene() {
+    if (!L) { titleScene(); return; }
+    const sc = sceneFor(), q = Math.min(4, Math.floor((D.dec(L.lp) - 1) / 2));
+    sky(sc === 'end' ? '#e98a5b' : '#6fa8dc', sc === 'end' ? '#f2c078' : '#9cc6e8');
+    cloud((frame * .3 + 20) % 190 - 20, 12); cloud((frame * .2 + 110) % 190 - 20, 22);
+    ground('#4f8a4b', '#3f7a3c');
+    if (sc === 'home' || sc === 'end') home(q);
+    if (sc === 'school') { px(20, 30, 70, 40, '#b5523b'); windowGrid(26, 36, 10, 4, 2); px(48, 56, 12, 14, '#5a3325'); px(95, 20, 1, 50, '#ccc'); px(96, 20, 10, 6, '#d9544d'); px(96, 23, 10, 1, '#fff'); }
+    if (sc === 'campus') { px(12, 34, 84, 36, '#d9d1bd'); px(8, 30, 92, 5, '#c2b89f'); px(30, 18, 48, 12, '#d9d1bd'); for (let i = 0; i < 7; i++) px(18 + i * 11, 38, 4, 32, '#efe8d6'); px(118, 40, 20, 18, '#3e8a4e'); px(126, 58, 4, 12, '#6b4a2b'); }
+    if (sc === 'work') {
+      if (L.lp >= 6) { px(14, 8, 44, 62, '#4a5a7a'); windowGrid(17, 12, 7, 8, 3); px(62, 26, 34, 44, '#5b6b8c'); windowGrid(65, 30, 5, 5, 2); }
+      else { px(8, 36, 96, 34, '#8a8f9c'); for (let i = 0; i < 4; i++) px(14 + i * 22, 48, 16, 22, '#5d6270'); px(8, 32, 96, 4, '#6b707c'); px(20, 26, 40, 6, '#d94f3a'); }
+    }
+    const pal = palette(sc), step = !reduced && (frame >> 3) % 2 === 1;
+    if (L.age < 3) drawSprite('baby', 72, 58, pal, false);
+    else if (L.age < 14) drawSprite('kid', 124, 50, pal, step);
+    else drawSprite(L.gender === 'f' ? 'adult_f' : 'adult_m', sc === 'home' || sc === 'end' ? 124 : 112, 42, pal, sc === 'end' ? false : step);
+  }
   function loop() { frame++; if (frame % 2 === 0) { g.clearRect(0, 0, W, H); scene(); } if (!reduced) requestAnimationFrame(loop); }
 
-  // ---------- UI ----------
-  function srcLinks(keys) { return keys.map(k => `<a href="${LL.SRC[k][1]}" target="_blank" rel="noopener">${LL.SRC[k][0]}</a>`).join(' &middot; '); }
-
-  function barHTML(v, big) {
+  // ---------- UI pieces ----------
+  function barHTML(v) {
     let h = '';
-    for (let i = 1; i <= 10; i++) h += `<span class="seg ${i <= v ? 'on' : ''} ${i === LL.LINE ? 'line' : ''}"></span>`;
-    return `<span class="bar10${big ? ' big' : ''}" role="img" aria-label="Bar ${v} of 10">${h}</span>`;
+    for (let i = 1; i <= 10; i++) h += `<span class="seg ${i <= v ? 'on' : ''}"></span>`;
+    return `<span class="bar10" role="img" aria-label="Income decile ${v} of 10">${h}</span>`;
   }
-  function ticker(prevBar) {
+  function ticker(delta) {
     const t = $('ticker');
     if (!L) { t.hidden = true; return; }
     t.hidden = false;
-    const r = L.lastResolved;
-    const flash = r ? `<span class="tk-flash ${r.hit ? 'hit' : 'miss'}">GOAL ${r.idx} ${r.hit ? 'HIT' : 'MISSED'} AT ${r.bar}/10: ${r.title}</span>` : '';
-    if (!L.goal) { t.innerHTML = flash || '<span class="tk-goal">ALL GOALS PLAYED</span>'; return; }
-    const G = L.goal, d = prevBar == null ? 0 : L.bar - prevBar;
-    t.innerHTML = `${flash}<span class="tk-idx">GOAL ${G.idx}/5</span><span class="tk-goal">${G.title}</span>
-      ${barHTML(L.bar)}<span class="tk-pts"><b>${L.bar}</b>/10 ${d ? `<em class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '&#9650;' : '&#9660;'}${Math.abs(d)}</em>` : ''}</span>`;
+    const d = D.dec(L.lp);
+    t.innerHTML = `<span class="tk-idx">INCOME DECILE</span>${barHTML(d)}
+      <span class="tk-pts"><b>${d}</b>/10 ${delta ? `<em class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '&#9650;' : '&#9660;'}${Math.abs(delta)}</em>` : ''}</span>
+      ${L.need ? `<span class="tk-odds">ROLL ${L.need}+ TO WIN &middot; ${(11 - L.need) * 10}%</span>` : ''}`;
   }
   function hud() {
     $('hud').hidden = !L;
     if (!L) return;
-    $('hAge').textContent = L.age > 90 ? '-' : L.age;
-    $('hPct').textContent = L.age < 18 ? 'PARENTS ' + LL.ord(L.parentPct) : L.edu === 'college' && L.age < 24 ? 'STUDENT' : L.scene === 'jail' ? 'NONE' : LL.ord(L.pct);
-    $('tag').textContent = L.scene === 'end' ? 'EPILOGUE' : 'AGE ' + L.age;
+    $('hAge').textContent = L.over ? '55+' : L.age;
+    $('hPct').textContent = (L.age < 18 ? 'FAMILY ' : '') + '~' + money(dollars(D.dec(L.lp))) + '/YR';
+    $('tag').textContent = L.over ? 'EPILOGUE' : L.age ? 'AGE ' + L.age : 'BIRTH';
   }
-  function say(lines, cards) {
-    const why = cards && cards.length ? `<button class="why" id="whyBtn" aria-expanded="false">WHY?</button><div class="cards" id="cards" hidden>${cards.map(c => `<div class="card"><h3>WHAT THE DATA SAYS</h3><p>${c.text}</p><p class="src">${srcLinks(c.src)}</p></div>`).join('')}</div>` : '';
-    $('dialog').innerHTML = lines.map(l => `<p class="${l.tone || ''}">${l.text}</p>`).join('') + why;
+  function card(c, title) {
+    return `<div class="card"><h3>${title || 'WHAT THE DATA SAYS'}</h3><p>${c.text}</p>${c.src && c.src.length ? `<p class="src">${srcLinks(c.src)}</p>` : ''}</div>`;
+  }
+  function say(html, cards) {
+    const why = cards && cards.length ? `<button class="why" id="whyBtn" aria-expanded="false">WHY?</button><div class="cards" id="cards" hidden>${cards.join('')}</div>` : '';
+    $('dialog').innerHTML = html + why;
     const wb = $('whyBtn');
     if (wb) wb.onclick = () => { const c = $('cards'); c.hidden = !c.hidden; wb.setAttribute('aria-expanded', String(!c.hidden)); wb.textContent = c.hidden ? 'WHY?' : 'HIDE'; };
   }
@@ -131,164 +134,189 @@
       const b = document.createElement('button');
       b.className = 'btn' + (primary ? ' primary' : '');
       b.innerHTML = `<span class="cur">&#9654;</span><span>${label}${sub ? `<small>${sub}</small>` : ''}</span>`;
-      b.addEventListener('click', fn); box.appendChild(b);
+      b.addEventListener('click', () => { if (!busy) fn(); }); box.appendChild(b);
     });
+    const first = box.querySelector('button');
+    if (first && L) first.focus({ preventScroll: true });
   }
+  function redraw() { if (reduced) { g.clearRect(0, 0, W, H); scene(); } }
 
+  // ---------- start ----------
+  function drawStart(fixed) {
+    const r = Math.random;
+    let race = fixed.race, gender = fixed.gender || (r() < .5 ? 'f' : 'm'), start = fixed.start;
+    if (!race) {
+      const keys = Object.keys(D.RACES), w = keys.map(k => DATA.groups[k + '_f'].count + DATA.groups[k + '_m'].count), tot = w.reduce((a, b) => a + b);
+      let x = r() * tot; race = keys.find((k, i) => (x -= w[i]) < 0) || 'white';
+    }
+    if (!start) {
+      const pq = DATA.groups[race + '_' + gender].parQ; let x = r(), q = 0;
+      while (q < 4 && (x -= pq[q]) > 0) q++;
+      start = q * 2 + 1 + (r() < .5 ? 0 : 1);
+    }
+    return { race, gender, start };
+  }
   function start(fixed) {
-    L = LL.newLife('life-' + Date.now() + '-' + Math.random(), fixed);
-    choiceLog = []; pathAnswer = null; $('extra').innerHTML = '';
-    hud(); ticker(null);
-    say([{ text: LL.describeBirth(L) }], [LL.birthCard(L)]);
-    choices([['GROW UP', null, () => step(null), true]]);
+    const o = drawStart(fixed || {});
+    const seed = 'life-' + Date.now() + '-' + Math.random();
+    L = { ...o, seed, dice: D.rollDice(seed), tone: Math.floor(Math.random() * 6), lp: o.start, age: 0, need: null, i: 0, over: false, child: !!(fixed && fixed.child) };
+    L.life = D.simulate(o, L.dice);
+    $('extra').innerHTML = '';
+    hud(); ticker(0); redraw();
+    const d = o.start, mob = DATA.groups[o.race + '_' + o.gender].mob[fifth(d)];
+    const intro = L.child ? `<p>Your child is born. They start where you ended up.</p>` : '';
+    say(`${intro}<p>You're a ${D.RACES[o.race]} ${o.gender === 'f' ? 'girl' : 'boy'}.</p>
+      <p>Your family is in the <b>${ord(d)} income decile</b>, about ${money(dollars(d))} a year.</p>
+      <p class="q">From age 5 to 55 you'll roll a die. Your income sets your odds.</p>`,
+      [card({ text: `Of ${who(o.race, o.gender)} born to parents in the ${FIFTHS[fifth(d)]}, ${Math.round(mob[4] * 100)}% ended up in the top fifth as adults, and ${Math.round(mob[0] * 100)}% in the bottom fifth.`, src: ['race'] })]);
+    choices([['START LIFE', null, () => nextAge(), true]]);
     window.scrollTo({ top: 0 });
   }
 
-  // Show one event per screen; the question, choices and WHY? arrive on the last screen.
-  function present(lines, cards, finalize) {
-    const main = lines.filter(l => l.tone !== 'q'), qs = lines.filter(l => l.tone === 'q');
-    const pages = main.length ? main.map(l => [l]) : [[]];
-    pages[pages.length - 1].push(...qs);
-    let i = 0;
-    const show = () => {
-      if (i < pages.length - 1) {
-        say(pages[i]);
-        choices([['NEXT', `${i + 1} of ${pages.length}`, () => { i++; show(); }, true]]);
-      } else { say(pages[i], cards); finalize(); }
-    };
-    show();
-  }
-
-  function step(focus, answer) {
-    choiceLog.push(focus ?? null);
-    const prev = L.bar;
-    L.pending = null;
-    const lines = LL.advance(L, focus, answer);
-    hud();
-    ticker(prev);
-    if (L.done) { present(lines, L.cards, finish); return; }
-    const out = lines.length ? lines : [{ text: 'Life goes on.' }];
-    if (L.pending) {
-      const P = L.pending;
-      if (P.q) out.push({ text: P.q, tone: 'q' });
-      present(out, L.cards, () => {
-        if (P.key === 'path') choices(P.options.map(([k, label, sub], i) => [label, sub, () => { pathAnswer = k; step('steady', k); }, i === 0]));
-        else choices(P.options.map(([k, label, sub]) => [label, sub, () => step('steady', 'go'), true]));
-      });
-      return;
+  // ---------- play ----------
+  const steps = () => L.life.steps;
+  function nextAge() {
+    const s = steps()[L.i];
+    if (!s) { finish(); return; }
+    L.age = s.age; hud(); redraw();
+    const here = steps().filter((x, j) => j >= L.i && x.age === s.age);
+    const rolls = here.filter(x => x.kind === 'roll').length;
+    let html = `<p class="stage">AGE ${s.age} &middot; ${D.STAGE[s.age].toUpperCase()}</p>`, cards = [];
+    if (s.kind === 'odds') {
+      L.need = s.need; L.i++;
+      html += `<p>Your odds match your income right now: decile ${s.dec}.</p><p class="q">Roll ${s.need} or higher to win (${s.chance}% chance).</p>`;
+      cards.push(card({ text: `Your chance to win is your income decile minus one, times 10%, but never below ${D.MIN_CH}% or above ${D.MAX_CH}%. It resets at 5, 15, 25, 35, 45 and 55. A win is +${D.WIN}, a loss is ${D.LOSE}, so you need about one win in three just to hold your place. Money works like that: savings, family help and good schools turn bad luck into a setback instead of a fall.` }, 'HOW THE ODDS WORK'));
+    } else if (rolls) {
+      html += `<p class="q">Roll ${L.need} or higher to win (${(11 - L.need) * 10}% chance).</p>`;
     }
-    if (L.age < 17) { present(out, L.cards, () => choices([['KEEP GOING', null, () => step(null), true]])); return; }
-    const next = LL.TURNS[L.turn + 1];
-    out.push({ text: `How do you spend the next ${next.age - L.age} years?`, tone: 'q' });
-    const q = LL.dreamFor(L);
-    const goFor = q ? [[q.tries ? 'TRY AGAIN' : 'GO FOR IT', `${q.dream} +1 if it works: about ${Math.round(q.odds * 100)}% chance${q.tries ? ', better than last time' : ''}.`, () => step('dream'), true]] : [];
-    const lowKids = L.kids.length && L.pct < 40;
-    present(out, L.cards, () => {
-      if (L.scene === 'jail') { choices([...goFor, ['SERVE YOUR TIME', null, () => step('steady'), !q]]); return; }
-      choices([
-        ...goFor,
-        [L.edu === 'college' ? 'STUDY HARD' : 'TAKE NIGHT CLASSES', 'Half the time: +1.', () => step('study'), !q],
-        ['PICK UP EXTRA SHIFTS', lowKids ? '+1, but your family pays for it: -1.' : '+1, with a chance of burnout: -1.', () => step('hustle')],
-        ['REST AND SEE FAMILY', 'Setbacks are half as likely this round.', () => step('rest')],
-      ]);
-    });
+    ticker(0);
+    if (rolls) {
+      html += `<p class="note">${rolls === 2 ? 'Big year: two rolls.' : 'One roll.'} Win: +${D.WIN}. Lose: ${D.LOSE}.</p>`;
+      say(html, cards);
+      choices([[rolls === 2 ? 'ROLL 1 OF 2' : 'ROLL', null, doRoll, true]]);
+    } else { say(html, cards); nextStep(); }
+  }
+  function nextStep() {
+    const s = steps()[L.i];
+    if (!s) { finish(); return; }
+    if (s.age !== L.age) { nextAge(); return; }
+    if (s.kind === 'pen') showPenalty(s);
+  }
+  function doRoll() {
+    const s = steps()[L.i];
+    busy = true;
+    const show = n => `<div class="rollrow"><div class="die" aria-hidden="true">${n}</div><div><p class="stage">AGE ${s.age}${s.of === 2 ? ` &middot; ROLL ${s.idx + 1} OF 2` : ''}</p><p class="note">Need ${s.need}+</p></div></div>`;
+    const finishRoll = () => {
+      busy = false; L.i++; L.lp = s.lp; hud(); ticker(s.delta); redraw();
+      say(`<div class="rollrow"><div class="die ${s.win ? 'win' : 'lose'}" role="img" aria-label="You rolled ${s.die}">${s.die}</div>
+        <div><p class="stage">AGE ${s.age}${s.of === 2 ? ` &middot; ROLL ${s.idx + 1} OF 2` : ''}</p><p class="delta ${s.win ? 'good' : 'bad'}">${s.win ? 'WIN' : 'MISS'} ${s.delta > 0 ? '+' : ''}${s.delta || (s.win ? '+0' : '0')}</p></div></div>
+        <p class="${s.win ? 'good' : 'bad'}">${s.text}</p>${s.delta === 0 ? `<p class="note">${s.win ? 'You were already at the top.' : 'You were already at the bottom. It can\'t get lower on paper.'}</p>` : ''}`);
+      const nx = steps()[L.i];
+      if (nx && nx.age === s.age && nx.kind === 'roll') choices([['ROLL 2 OF 2', null, doRoll, true]]);
+      else if (nx && nx.age === s.age) choices([['NEXT', null, nextStep, true]]);
+      else choices([[nx ? 'KEEP GOING' : 'SEE HOW IT ENDS', null, nextAge, true]]);
+    };
+    $('choices').innerHTML = '';
+    if (reduced) { finishRoll(); return; }
+    let t = 0;
+    const spin = setInterval(() => {
+      say(show(1 + Math.floor(Math.random() * 10)));
+      if (++t >= 9) { clearInterval(spin); finishRoll(); }
+    }, 70);
+  }
+  function showPenalty(s) {
+    L.i++; L.lp = s.lp; hud(); ticker(s.delta); redraw();
+    say(`<p class="stage">AGE ${s.age} &middot; ${s.name} ${s.delta ? s.delta : '-0'}</p><p class="bad">${s.text}</p>
+      ${s.delta === 0 ? '<p class="note">You were already at the bottom.</p>' : ''}
+      <p class="note">${s.type === 'cost' ? 'Everyone takes this hit.' : s.type === 'girl' ? 'Only girls take this hit.' : 'Only Black, Hispanic and Native players take this hit.'}</p>`, [card(s.card)]);
+    const nx = steps()[L.i];
+    if (nx && nx.age === s.age) choices([['NEXT', null, nextStep, true]]);
+    else choices([[nx ? 'KEEP GOING' : 'SEE HOW IT ENDS', null, nextAge, true]]);
   }
 
   // ---------- ending ----------
-  function sparkline() {
-    const pts = L.history, w = 300, h = 96, pad = 16, maxAge = 64;
-    const x = a => pad + (Math.min(a, maxAge) / maxAge) * (w - pad * 2), y = v => h - pad - (v / 10) * (h - pad * 2);
-    const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.age).toFixed(1)},${y(p.bar).toFixed(1)}`).join(' ');
-    return `<svg viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="Your bar over your life">
-      <line x1="${pad}" x2="${w - pad}" y1="${y(LL.LINE)}" y2="${y(LL.LINE)}" class="grid"/>
-      <text x="${w - pad}" y="${y(LL.LINE) - 3}" class="lbl" text-anchor="end">NEED ${LL.LINE}</text>
-      <path d="${path}" class="line"/>
-      ${pts.map(p => `<rect x="${(x(p.age) - 2).toFixed(1)}" y="${(y(p.bar) - 2).toFixed(1)}" width="4" height="4" class="dot"/>`).join('')}
-      ${[0, 18, 24, 35, 64].map(a => `<text x="${x(a)}" y="${h - 3}" class="lbl" text-anchor="middle">${a === 64 ? '60+' : a}</text>`).join('')}
+  function sparkline(lines) {
+    const w = 300, h = 110, pad = 18;
+    const x = a => pad + (a / 55) * (w - pad * 2), y = v => h - pad - ((v - 1) / 9) * (h - pad * 2);
+    const path = pts => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.age).toFixed(1)},${y(p.lp).toFixed(1)}`).join(' ');
+    return `<svg viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="Your income decile from birth to 55">
+      ${[1, 5, 10].map(v => `<line x1="${pad}" x2="${w - pad}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${pad - 4}" y="${y(v) + 4}" class="lbl" text-anchor="end">${v}</text>`).join('')}
+      ${lines.map(([pts, cls]) => `<path d="${path(pts)}" class="${cls}"/>`).join('')}
+      ${[0, 18, 35, 55].map(a => `<text x="${x(a)}" y="${h - 3}" class="lbl" text-anchor="middle">${a}</text>`).join('')}
     </svg>`;
   }
-  function oddsTable(pp) {
-    const T = LL.table(pp), pctf = v => v == null ? '&ndash;' : Math.round(v[0] * 100) + '%' + (v[1] ? '<sup>*</sup>' : '');
-    const races = [['black', 'BLACK'], ['asian', 'ASIAN'], ['white', 'WHITE'], ['hisp', 'HISPANIC']];
-    return `<div class="scroll"><table class="odds wide">
-      <thead><tr><th rowspan="2">GOAL</th>${races.map(([, n]) => `<th colspan="2" class="grp">${n}</th>`).join('')}</tr>
-      <tr>${races.map(() => '<th>GIRLS</th><th>BOYS</th>').join('')}</tr></thead>
-      <tbody>${T.rows.map(([label, vals]) => `<tr><td>${label}</td>${vals.map((v, i) => `<td class="${T.groups[i][0] === L.race && T.groups[i][1] === L.gender ? 'you' : ''}">${v[0] == null ? '&ndash;' : pctf(v)}</td>`).join('')}</tr>`).join('')}
-      <tr><td>Finish a degree, once started</td><td colspan="8" class="all">${Math.round(T.finish * 100)}% for all groups (not published by race)</td></tr>
-      <tr><td>Out-earn your parents</td><td colspan="8" class="all">${Math.round(T.outearn * 100)}% for all groups (not published by race)</td></tr>
-      </tbody></table></div>
-      <p class="note"><sup>*</sup> Estimated. High school and college rates are published only for Black and white children, so Asian and Hispanic cells use the Black and white average (high school) or the Pell Institute income gradient (college). &ndash; means not published.</p>`;
-  }
   function finish() {
-    const n = Object.values(L.results).filter(Boolean).length;
-    const parentAt = Math.round(L.pct);
+    L.over = true; L.need = null; hud(); ticker(0); redraw();
+    const fin = L.life.final, [, title, blurb] = D.ending(fin);
+    say(`<p class="stage">AGE 55 &middot; ${title}</p><p>${blurb}</p><p>You finished in the <b>${ord(fin)} decile</b>, about ${money(dollars(fin))} a year. You started in the ${ord(L.start)}.</p>`);
     choices([
-      ...(L.kids.length ? [['PLAY AS YOUR CHILD', `Their life starts where yours got to: the ${LL.ord(parentAt)} percentile.`, () => start({ race: L.race, parentPct: parentAt }), true]] : []),
-      ['DRAW ANOTHER LIFE', null, () => start({}), !L.kids.length],
+      ['PLAY AS YOUR CHILD', `They start where you ended: the ${ord(fin)} decile.`, () => start({ race: L.race, start: fin, child: true }), true],
+      ['DRAW ANOTHER LIFE', null, () => start({})],
       ['CHOOSE YOUR START', 'Pick race, gender and family income.', chooser],
     ]);
-    const altPct = L.parentPct <= 60 ? 95 : 5;
-    const alt = LL.simulate(L.seed, { race: L.race, gender: L.gender, parentPct: altPct }, { list: choiceLog, path: pathAnswer || 'school' });
-    const altN = Object.values(alt.results).filter(Boolean).length;
-    const names = { hs: 'High school', path: L.path === 'school' ? 'Degree' : 'Steady job', middle: 'Out of bottom 40%', outearn: 'Out-earn parents', live65: 'Live to 65' };
+    // Same dice, different start / different player
+    const o = { race: L.race, gender: L.gender, start: L.start };
+    const altStart = L.start <= 5 ? 10 : 1;
+    const privileged = (L.race === 'white' || L.race === 'asian') && L.gender === 'm';
+    const altWho = privileged ? { race: 'black', gender: 'f' } : { race: 'white', gender: 'm' };
+    const A = D.simulate({ ...o, start: altStart }, L.dice), B = D.simulate({ ...o, ...altWho }, L.dice);
+    const row = (label, life, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${ord(life.start)}</td><td>${ord(life.final)}</td><td>${D.ending(life.final)[1]}</td></tr>`;
+    // Game vs real for your group and starting fifth
+    const game = D.gameOdds(o, 20000), real = DATA.groups[L.race + '_' + L.gender].mob[fifth(L.start)];
+    const bars = FIFTHS.map((f, i) => `<div class="fifth ${i === fifth(fin) ? 'you' : ''}"><span class="fl">${f.replace(' fifth', '').toUpperCase()}</span>
+      <span class="fb"><i class="g" style="width:${Math.round(game[i] * 100)}%"></i></span><span class="fv">${Math.round(game[i] * 100)}%</span>
+      <span class="fb"><i class="r" style="width:${Math.round(real[i] * 100)}%"></i></span><span class="fv">${Math.round(real[i] * 100)}%</span></div>`).join('');
     $('extra').innerHTML = `
       <div class="panel">
-        <h2>WHAT YOU BUILT</h2>
-        ${L.wins.length ? `<ul class="wins">${[...L.wins].sort((a, b) => a.age - b.age).map(w => `<li><span>${w.age}</span>${w.text}</li>`).join('')}</ul>` : '<p>A hard life. You kept going.</p>'}
+        <h2>YOUR LIFE</h2>
+        ${sparkline([[A.hist, 'line alt'], [B.hist, 'line alt2'], [L.life.hist, 'line']])}
+        <p class="note"><span class="key k1"></span>You <span class="key k2"></span>Born in the ${ord(altStart)} decile <span class="key k3"></span>Born a ${who(altWho.race, altWho.gender).replace(/s$/, '')}</p>
       </div>
       <div class="panel">
-        <h2>YOUR GOALS: ${n} OF 5</h2>
-        <ul class="res">${Object.keys(names).map(k => `<li class="${L.results[k] ? 'hit' : 'miss'}"><i>${L.results[k] ? '&#10003;' : 'x'}</i>${names[k]}</li>`).join('')}</ul>
-        ${sparkline()}
-        <p class="note">Your bar over your life. Ending a goal at ${LL.LINE} or above hits it; the bar carries into the next goal.</p>
+        <h2>SAME ROLLS. DIFFERENT START.</h2>
+        <p>We replayed your life with the exact same dice. Only the start changed.</p>
+        <div class="scroll"><table class="odds"><thead><tr><th></th><th>START</th><th>AGE 55</th><th>ENDING</th></tr></thead><tbody>
+          ${row('You', L.life, 'you')}
+          ${row(`Born in the ${ord(altStart)} decile`, A)}
+          ${row(`Born a ${who(altWho.race, altWho.gender).replace(/s$/, '')}`, B)}
+        </tbody></table></div>
       </div>
       <div class="panel">
-        <h2>SAME YOU. SAME CHOICES. SAME LUCK.</h2>
-        <p>We replayed your life with one change: your parents' income.</p>
-        <div class="compare">
-          <div><h3>BORN AT THE ${LL.ord(L.parentPct).toUpperCase()}</h3><p>${n} of 5 goals</p><p>Income at 35: ${LL.ord(L.pct)}</p><p>Lived to ${L.deathAge}</p></div>
-          <div><h3>BORN AT THE ${LL.ord(altPct).toUpperCase()}</h3><p>${altN} of 5 goals</p><p>Income at 35: ${LL.ord(alt.pct)}</p><p>Lived to ${alt.deathAge}</p></div>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>THE ODDS, BY GROUP</h2>
-        <p>Published rates for kids whose parents were in the selected income group. Your group is highlighted.</p>
-        <div class="seg-pick" role="group" aria-label="Parents' income">${['Bottom 20%', '2nd 20%', 'Middle 20%', '4th 20%', 'Top 20%'].map((n, i) => `<button class="pick ${i === L.pq ? 'on' : ''}" data-pp="${i * 20 + 10}">${n}</button>`).join('')}</div>
-        <div id="oddsTable">${oddsTable(L.pq * 20 + 10)}</div>
+        <h2>THE GAME VS REAL LIFE</h2>
+        <p>Where ${who(L.race, L.gender)} from the ${FIFTHS[fifth(L.start)]} end up as adults.</p>
+        <div class="fifths"><div class="fifth head"><span class="fl"></span><span class="fh">IN THE GAME</span><span></span><span class="fh">REAL DATA</span><span></span></div>${bars}</div>
+        <p class="note">Game: 20,000 simulated lives with your start. Real: children born 1978&ndash;83, incomes measured in their 30s. The game is simpler than life, so the numbers won't match exactly. Your ending fifth is highlighted.</p>
+        <p class="src">${srcLinks(['race', 'oidata'])}</p>
       </div>
       ${sources()}`;
-    document.querySelectorAll('.seg-pick .pick').forEach(b => b.onclick = () => {
-      document.querySelectorAll('.seg-pick .pick').forEach(x => x.classList.toggle('on', x === b));
-      $('oddsTable').innerHTML = oddsTable(+b.dataset.pp);
-    });
+    window.scrollTo({ top: 0 });
   }
   function sources() {
     return `<div class="panel" id="sources">
       <h2>WHERE THE NUMBERS COME FROM</h2>
-      <ul class="sources">${Object.values(LL.SRC).map(([label, url]) => `<li><a href="${url}" target="_blank" rel="noopener">${label}</a></li>`).join('')}</ul>
-      <p class="sources">How the bar works: every event moves it by 1. Once a round, a roll uses the published odds for kids born where you were, pulling the bar toward where they usually end up, so across many lives the game lands near the real rates. Event chances by income are our modelling choice. Gaps by race reflect neighborhoods, schools, discrimination and family wealth, not race itself.</p>
+      <ul class="sources">${Object.values(D.SRC).map(([label, url]) => `<li><a href="${url}" target="_blank" rel="noopener">${label}</a></li>`).join('')}</ul>
+      <p class="sources">How the game works: you start at your parents' income decile. At each stop you roll a 1&ndash;10 die. Your chance to win is your decile minus one, times 10%, between ${D.MIN_CH}% and ${D.MAX_CH}%, reset at 5, 15, 25, 35, 45 and 55. Win +${D.WIN}, lose ${D.LOSE}. Everyone pays a Cost of Living hit at 18, 33 and 48. Girls take a hit at 25, 35 and 45; Black, Hispanic and Native players at 30, 40 and 50. We tuned these rules so that, across many lives, the game lands close to the real mobility data. Gaps by race reflect neighborhoods, schools, discrimination and family wealth, not race itself.</p>
     </div>`;
   }
   function chooser() {
+    L = null; hud(); ticker(0); redraw();
     $('extra').innerHTML = '';
-    say([{ text: 'Pick a starting point. Everything after birth still comes down to the odds.' }]);
+    say('<p>Pick a starting point. After that, it\'s up to the dice.</p>');
     $('choices').innerHTML = `
       <div class="panel">
-        <label class="f" for="cRace">RACE / ETHNICITY<select id="cRace"><option value="white">White</option><option value="black">Black</option><option value="hisp">Hispanic</option><option value="asian">Asian</option><option value="aian">American Indian</option></select></label>
-        <label class="f" for="cGender">GENDER<select id="cGender"><option value="f">Female</option><option value="m">Male</option></select></label>
-        <label class="f" for="cPar">PARENTS' INCOME<select id="cPar"><option value="10">Bottom 20%</option><option value="30">2nd 20%</option><option value="50" selected>Middle 20%</option><option value="70">4th 20%</option><option value="90">Top 20%</option></select></label>
+        <label class="f" for="cRace">RACE / ETHNICITY<select id="cRace">${Object.entries(D.RACES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
+        <label class="f" for="cGender">GENDER<select id="cGender"><option value="f">Girl</option><option value="m">Boy</option></select></label>
+        <label class="f" for="cPar">PARENTS' INCOME DECILE<select id="cPar">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i === 4 ? 'selected' : ''}>${i + 1}${i === 0 ? ' (bottom 10%)' : i === 9 ? ' (top 10%)' : ''} &middot; ~${money(dollars(i + 1))}</option>`).join('')}</select></label>
       </div>`;
     const b = document.createElement('button');
     b.className = 'btn primary'; b.innerHTML = '<span class="cur">&#9654;</span><span>START THIS LIFE</span>';
-    b.onclick = () => start({ race: $('cRace').value, gender: $('cGender').value, parentPct: +$('cPar').value + Math.floor(Math.random() * 19) - 9 });
+    b.onclick = () => start({ race: $('cRace').value, gender: $('cGender').value, start: +$('cPar').value });
     $('choices').appendChild(b);
   }
   function titleScreen() {
-    L = null; hud(); ticker();
-    say([
-      { text: 'You don\'t choose where you\'re born. Draw a random American life and chase five goals, one at a time.' },
-      { text: 'Your bar runs from 0 to 10. End each goal at 6 or more to hit it. Every round, the real odds for kids like you push it up or down. Tap WHY? to see the numbers.', tone: 'q' },
-    ]);
+    L = null; hud(); ticker(0);
+    say(`<p>You don't choose where you're born. Draw a random American life and roll your way from age 5 to 55.</p>
+      <p class="q">Your family's income sets your odds. Win a roll: +2. Lose: &minus;1. Tap WHY? to see the real data.</p>`);
     choices([
       ['DRAW A LIFE', 'Random start, weighted like real US births.', () => start({}), true],
       ['CHOOSE YOUR START', 'Pick race, gender and family income.', chooser],

@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Life Lottery</title>
-<meta name="description" content="Draw a random American life and see how far you get. Every odd comes from real US mobility data. An Equitable Earth Solutions tool.">
+<meta name="description" content="Draw a random American life and roll from age 5 to 55. Your family's income sets your odds. Built on real US mobility data. An Equitable Earth Solutions tool.">
 <meta property="og:title" content="Life Lottery">
-<meta property="og:description" content="Draw a random American life. The odds are real.">
+<meta property="og:description" content="Draw a random American life. Roll the dice. Your family's income sets your odds.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
-/* Layout: one narrow game column, like a handheld: goal ticker, HUD, scene, dialog box with a WHY? data card, choices. Single dark theme on purpose. */
+/* Layout: one narrow game column, like a handheld: income ticker, HUD, scene, dialog box with a die and a WHY? data card, choices. Single dark theme on purpose. */
 :root{
   --night:#1b1830; --panel:#26213f; --edge:#4a3f73; --paper:#f1e7d0; --dim:#b3a8c9;
   --amber:#f2a541; --good:#5cc8a6; --bad:#ec6a5e;
@@ -107,6 +107,23 @@ select{font-family:var(--type);font-size:22px;background:var(--night);color:var(
 .sources li{margin-bottom:4px}
 footer{font-family:var(--pixel);font-size:7px;color:var(--dim);text-align:center;line-height:1.8}
 footer a{color:var(--dim)}
+.stage{font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--amber);line-height:1.6}
+.rollrow{display:flex;gap:14px;align-items:center}
+.die{flex:none;width:64px;height:64px;display:grid;place-items:center;background:var(--night);border:4px solid var(--paper);box-shadow:inset 0 0 0 3px var(--panel);font-family:var(--pixel);font-size:22px;color:var(--paper)}
+.die.win{border-color:var(--good);color:var(--good)} .die.lose{border-color:var(--bad);color:var(--bad)}
+.delta{font-family:var(--pixel);font-size:13px;line-height:1.6} .delta.good{color:var(--good)} .delta.bad{color:var(--bad)}
+.tk-odds{flex:1 1 100%;color:var(--paper)}
+.spark .line.alt{stroke:var(--dim);stroke-dasharray:4 3} .spark .line.alt2{stroke:var(--good);stroke-dasharray:2 3}
+.key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin:0 4px 0 8px;background:var(--amber)} .key.k1{margin-left:0} .key.k2{background:var(--dim)} .key.k3{background:var(--good)}
+.fifths{display:flex;flex-direction:column;gap:6px}
+.fifth{display:grid;grid-template-columns:62px 1fr 34px 1fr 34px;gap:6px;align-items:center;font-size:18px}
+.fifth .fl,.fifth .fh{font-family:var(--pixel);font-size:7px;color:var(--dim);letter-spacing:.5px}
+.fifth.you .fl{color:var(--amber)}
+.fb{height:10px;background:var(--night);border:1px solid var(--edge);position:relative;min-width:0}
+.fb i{position:absolute;inset:0 auto 0 0} .fb i.g{background:var(--amber)} .fb i.r{background:var(--good)}
+.fv{text-align:right;font-variant-numeric:tabular-nums}
+.odds tr.you td{color:var(--amber)}
+.src{font-size:17px;color:var(--dim)} .src a{color:var(--paper)}
 @media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}}
 </style>
 </head>
@@ -131,7 +148,7 @@ footer a{color:var(--dim)}
   <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>A TOOL BY <a href="https://equitableearth.solutions">EQUITABLE EARTH SOLUTIONS</a></footer>
 </div>
 <script src="data-us.js"></script>
-<script src="engine.js"></script>
+<script src="dice.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
