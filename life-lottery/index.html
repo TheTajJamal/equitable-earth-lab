@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
-/* Layout: one narrow game column, like a handheld: HUD, scene, dialog box, choices, goals. Single dark theme on purpose. */
+/* Layout: one narrow game column, like a handheld: goal ticker, HUD, scene, dialog box with a WHY? data card, choices. Single dark theme on purpose. */
 :root{
   --night:#1b1830; --panel:#26213f; --edge:#4a3f73; --paper:#f1e7d0; --dim:#b3a8c9;
   --amber:#f2a541; --good:#5cc8a6; --bad:#ec6a5e;
@@ -26,7 +26,7 @@ header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 header h1{font-family:var(--pixel);font-size:14px;letter-spacing:1px;margin:0;color:var(--amber)}
 header a{font-family:var(--pixel);font-size:8px;color:var(--dim);text-decoration:none;letter-spacing:.5px}
 header a:hover,header a:focus-visible{color:var(--paper)}
-.hud{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--dim)}
+.hud{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--dim)}
 .hud b{color:var(--paper);font-weight:400}
 .wincount{color:var(--amber)} .wincount b{color:var(--amber)}
 .wins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
@@ -52,11 +52,40 @@ canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rend
 .btn.primary .cur{color:var(--night)}
 .btn.primary small{color:var(--night);opacity:.8}
 @keyframes blink{50%{visibility:hidden}}
-.goals{display:grid;grid-template-columns:1fr;gap:4px;font-family:var(--pixel);font-size:8px;letter-spacing:.5px;color:var(--dim);border-top:3px dashed var(--edge);padding-top:10px}
-.goal{display:flex;gap:8px;align-items:center}
-.goal i{font-style:normal;width:14px;height:14px;border:2px solid var(--dim);display:inline-grid;place-items:center;font-size:8px;flex:none}
-.goal.won{color:var(--good)} .goal.won i{border-color:var(--good);background:var(--good);color:var(--night)}
-.goal.lost{color:var(--bad);text-decoration:line-through} .goal.lost i{border-color:var(--bad)}
+.ticker{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;background:var(--panel);border:3px solid var(--amber);padding:8px 10px;font-family:var(--pixel);font-size:8px;letter-spacing:.5px;line-height:1.6;position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
+.tk-idx{color:var(--dim)} .tk-goal{color:var(--paper);flex:1 1 100%;font-size:9px}
+.tk-pts{color:var(--dim)} .tk-pts b{color:var(--amber);font-size:14px;font-weight:400}
+.tk-pts em{font-style:normal;margin-left:4px} .tk-pts em.up{color:var(--good)} .tk-pts em.down{color:var(--bad)}
+.tk-base{color:var(--dim);margin-left:auto}
+.tk-flash{flex:1 1 100%;padding:4px 6px;color:var(--night)} .tk-flash.hit{background:var(--good)} .tk-flash.miss{background:var(--bad)}
+.why{align-self:flex-start;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;background:none;color:var(--amber);border:2px solid var(--amber);padding:8px 10px;cursor:pointer;min-height:36px}
+.why:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.cards{display:flex;flex-direction:column;gap:8px}
+.card{border-left:4px solid var(--amber);background:var(--night);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.card h3{font-family:var(--pixel);font-size:7px;letter-spacing:.5px;color:var(--amber);margin:0}
+.card p{margin:0;font-size:19px} .card .src{font-size:17px;color:var(--dim)} .card a,.sources a{color:var(--paper)}
+.res{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-family:var(--pixel);font-size:8px;letter-spacing:.5px}
+.res li{display:flex;gap:8px;align-items:center} .res li.hit{color:var(--good)} .res li.miss{color:var(--bad)}
+.res i{font-style:normal;width:14px;height:14px;border:2px solid currentColor;display:inline-grid;place-items:center;font-size:8px}
+.res li.hit i{background:var(--good);color:var(--night)}
+.spark{width:100%;height:auto;max-width:100%}
+.spark .line{fill:none;stroke:var(--amber);stroke-width:2}
+.spark .grid{stroke:var(--edge);stroke-dasharray:3 3}
+.spark .lbl{fill:var(--dim);font-family:var(--type);font-size:12px}
+.spark .dot{fill:var(--amber)}
+.bar10{display:flex;gap:2px;flex:1 1 140px;min-width:0;align-self:center}
+.bar10 .seg{flex:1;height:14px;background:var(--edge)}
+.bar10 .seg.on{background:var(--amber)}
+.bar10 .seg.line{box-shadow:inset 3px 0 0 var(--paper)}
+.seg-pick{display:flex;flex-wrap:wrap;gap:4px}
+.pick{font-family:var(--pixel);font-size:7px;letter-spacing:.5px;background:var(--night);color:var(--dim);border:2px solid var(--edge);padding:8px 6px;cursor:pointer;min-height:32px}
+.pick.on{border-color:var(--amber);color:var(--amber)}
+.odds.wide{min-width:560px}
+.odds th.grp{text-align:center;color:var(--paper);border-bottom:1px solid var(--edge)}
+.odds td.you{color:var(--amber);background:rgba(242,165,65,.12)}
+.odds td.all{text-align:left;color:var(--dim)}
+.odds sup{font-size:12px;color:var(--dim)}
+.note{font-size:17px;color:var(--dim)}
 .panel{background:var(--panel);border:3px solid var(--edge);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .panel h2{font-family:var(--pixel);font-size:10px;letter-spacing:.5px;margin:0;color:var(--amber);line-height:1.5}
 .panel p{margin:0}
@@ -89,16 +118,14 @@ footer a{color:var(--dim)}
   <div class="hud" id="hud" hidden>
     <span>AGE <b id="hAge">0</b></span>
     <span>INCOME <b id="hPct">-</b></span>
-    <span class="wincount" aria-label="Small wins">&#9733; <b id="hWins">0</b></span>
-    <span class="hearts" id="hHearts" aria-label="Wellbeing"></span>
   </div>
+  <div class="ticker" id="ticker" hidden aria-live="polite"></div>
   <div class="screen">
     <canvas id="cv" width="160" height="96" aria-label="Pixel scene of your character"></canvas>
     <div class="agetag" id="tag">USA</div>
   </div>
   <div class="dialog" id="dialog" aria-live="polite"></div>
   <div class="choices" id="choices"></div>
-  <div class="goals" id="goals" hidden></div>
   <div id="extra"></div>
   <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>A TOOL BY <a href="https://equitableearth.solutions">EQUITABLE EARTH SOLUTIONS</a></footer>
 </div>
