@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Life Lottery</title>
-<meta name="description" content="Draw a random American life and roll from age 5 to 55. Your family's income sets your odds. Built on real US mobility data. An Equitable Earth Solutions tool.">
+<meta name="description" content="Draw a random American life and roll from age 5 to 55. Everyone rolls the same die. Not everyone takes the same hits. Built on real US mobility data. An Equitable Earth Solutions tool.">
 <meta property="og:title" content="Life Lottery">
-<meta property="og:description" content="Draw a random American life. Roll the dice. Your family's income sets your odds.">
+<meta property="og:description" content="Draw a random American life. Everyone rolls the same die. Not everyone takes the same hits.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -56,7 +56,10 @@ canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rend
 .ticker{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;background:var(--panel);border:3px solid var(--amber);padding:8px 10px;font-family:var(--pixel);font-size:8px;letter-spacing:.5px;line-height:1.6;position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
 .tk-idx{color:var(--dim)} .tk-goal{color:var(--paper);flex:1 1 100%;font-size:9px}
 .tk-pts{color:var(--dim)} .tk-pts b{color:var(--amber);font-size:14px;font-weight:400}
-.tk-pts em{font-style:normal;margin-left:4px} .tk-pts em.up{color:var(--good)} .tk-pts em.down{color:var(--bad)}
+.tk-pts{flex:none;display:inline-flex;align-items:baseline;white-space:nowrap} .tk-pts b{display:inline-block;min-width:3em;text-align:right}
+.tk-pts em{font-style:normal;display:inline-block;width:4ch;margin-left:6px;font-size:11px} .tk-pts em.up{color:var(--good)} .tk-pts em.down{color:var(--bad)}
+.tk-pts em.up,.tk-pts em.down{animation:bump .45s steps(4)}
+@keyframes bump{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
 .tk-base{color:var(--dim);margin-left:auto}
 .tk-flash{flex:1 1 100%;padding:4px 6px;color:var(--night)} .tk-flash.hit{background:var(--good)} .tk-flash.miss{background:var(--bad)}
 .why{align-self:flex-start;font-family:var(--pixel);font-size:9px;letter-spacing:.5px;background:none;color:var(--amber);border:2px solid var(--amber);padding:8px 10px;cursor:pointer;min-height:36px}
@@ -110,7 +113,16 @@ footer a{color:var(--dim)}
 .stage{font-family:var(--pixel);font-size:9px;letter-spacing:.5px;color:var(--amber);line-height:1.6}
 .rollrow{display:flex;gap:14px;align-items:center}
 .die{flex:none;width:64px;height:64px;display:grid;place-items:center;background:var(--night);border:4px solid var(--paper);box-shadow:inset 0 0 0 3px var(--panel);font-family:var(--pixel);font-size:22px;color:var(--paper)}
-.die.win{border-color:var(--good);color:var(--good)} .die.lose{border-color:var(--bad);color:var(--bad)}
+.die.win{border-color:var(--good);color:var(--good)} .die.lose{border-color:var(--bad);color:var(--bad)} .die.stay{border-color:var(--dim);color:var(--dim)}
+.delta.dim{color:var(--dim)}
+.lpbar{flex:1 1 140px;min-width:0;height:14px;align-self:center;background:var(--edge);position:relative}
+.lpbar i{position:absolute;inset:0 auto 0 0;background:var(--amber);transition:width .3s steps(4)}
+.lpbar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),var(--panel) calc(10% - 2px) 10%)}
+.zones{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.zc{font-family:var(--pixel);font-size:9px;text-align:center;padding:7px 0;border:2px solid transparent;color:var(--night)}
+.zc.lose{background:var(--bad)} .zc.stay{background:var(--dim)} .zc.win{background:var(--good)}
+.zc.hit{border-color:var(--paper);box-shadow:0 0 0 2px var(--night) inset;outline:2px solid var(--paper);outline-offset:1px}
+.zkey{font-size:17px;display:flex;flex-wrap:wrap;gap:4px 12px;margin:0} .zkey .lose{color:var(--bad)} .zkey .stay{color:var(--dim)} .zkey .win{color:var(--good)}
 .delta{font-family:var(--pixel);font-size:13px;line-height:1.6} .delta.good{color:var(--good)} .delta.bad{color:var(--bad)}
 .tk-odds{flex:1 1 100%;color:var(--paper)}
 .spark .line.alt{stroke:var(--dim);stroke-dasharray:4 3} .spark .line.alt2{stroke:var(--good);stroke-dasharray:2 3}
@@ -133,7 +145,7 @@ footer a{color:var(--dim)}
 .ev-delta{font-family:var(--pixel);font-size:28px;color:var(--bad);line-height:1.2} .ev-delta span{font-size:9px;letter-spacing:.5px}
 @keyframes pop{from{transform:scale(.8)}to{transform:none}}
 body.locked{overflow:hidden}
-@media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}.modal-box{animation:none}}
+@media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}.modal-box,.tk-pts em{animation:none}.lpbar i{transition:none}}
 </style>
 </head>
 <body>
