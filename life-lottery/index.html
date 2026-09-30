@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
-/* Layout: one narrow game column, like a handheld: income ticker, HUD, scene, dialog box with a die and a WHY? data card, choices. Single dark theme on purpose. */
+/* Layout: one narrow game column, like a handheld: life points ticker (with income and age), scene, dialog box with a die and a WHY? data card, choices. Life events pop up over everything. Single dark theme on purpose. */
 :root{
   --night:#1b1830; --panel:#26213f; --edge:#4a3f73; --paper:#f1e7d0; --dim:#b3a8c9;
   --amber:#f2a541; --good:#5cc8a6; --bad:#ec6a5e;
@@ -124,7 +124,16 @@ footer a{color:var(--dim)}
 .fv{text-align:right;font-variant-numeric:tabular-nums}
 .odds tr.you td{color:var(--amber)}
 .src{font-size:17px;color:var(--dim)} .src a{color:var(--paper)}
-@media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}}
+.tk-sub{flex:1 1 100%;color:var(--dim)} .tk-sub b{color:var(--paper);font-weight:400}
+.modal{position:fixed;inset:0;z-index:10;background:rgba(10,8,20,.8);display:grid;place-items:center;padding:16px}
+.modal-box{width:min(440px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--panel);border:4px solid var(--bad);box-shadow:0 0 0 4px var(--night),0 0 0 8px var(--bad);padding:16px;display:flex;flex-direction:column;gap:10px;animation:pop .2s steps(3)}
+.modal-box p{margin:0}
+.ev-tag{font-family:var(--pixel);font-size:8px;letter-spacing:.5px;color:var(--dim);line-height:1.6}
+.ev-name{font-family:var(--pixel);font-size:14px;letter-spacing:.5px;color:var(--bad);margin:0;line-height:1.5}
+.ev-delta{font-family:var(--pixel);font-size:28px;color:var(--bad);line-height:1.2} .ev-delta span{font-size:9px;letter-spacing:.5px}
+@keyframes pop{from{transform:scale(.8)}to{transform:none}}
+body.locked{overflow:hidden}
+@media (prefers-reduced-motion: reduce){.btn:hover .cur,.btn:focus-visible .cur{animation:none}.modal-box{animation:none}}
 </style>
 </head>
 <body>
@@ -133,10 +142,6 @@ footer a{color:var(--dim)}
     <h1>LIFE LOTTERY</h1>
     <a href="../">EQUITABLE EARTH SOLUTIONS</a>
   </header>
-  <div class="hud" id="hud" hidden>
-    <span>AGE <b id="hAge">0</b></span>
-    <span>INCOME <b id="hPct">-</b></span>
-  </div>
   <div class="ticker" id="ticker" hidden aria-live="polite"></div>
   <div class="screen">
     <canvas id="cv" width="160" height="96" aria-label="Pixel scene of your character"></canvas>
@@ -147,6 +152,7 @@ footer a{color:var(--dim)}
   <div id="extra"></div>
   <footer>ODDS FROM REAL US DATA &middot; <a href="#sources" id="srcLink">SOURCES</a><br>A TOOL BY <a href="https://equitableearth.solutions">EQUITABLE EARTH SOLUTIONS</a></footer>
 </div>
+<div class="modal" id="modal" hidden></div>
 <script src="data-us.js"></script>
 <script src="dice.js"></script>
 <script src="game.js"></script>

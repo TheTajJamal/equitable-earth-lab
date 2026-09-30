@@ -101,32 +101,48 @@
   function barHTML(v) {
     let h = '';
     for (let i = 1; i <= 10; i++) h += `<span class="seg ${i <= v ? 'on' : ''}"></span>`;
-    return `<span class="bar10" role="img" aria-label="Income decile ${v} of 10">${h}</span>`;
+    return `<span class="bar10" role="img" aria-label="${v} of 10 life points">${h}</span>`;
   }
   function ticker(delta) {
     const t = $('ticker');
     if (!L) { t.hidden = true; return; }
     t.hidden = false;
-    const d = D.dec(L.lp);
-    t.innerHTML = `<span class="tk-idx">INCOME DECILE</span>${barHTML(d)}
+    const d = D.dec(L.lp), kid = L.age < 18 && !L.over;
+    t.innerHTML = `<span class="tk-idx">LIFE POINTS</span>${barHTML(d)}
       <span class="tk-pts"><b>${d}</b>/10 ${delta ? `<em class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '&#9650;' : '&#9660;'}${Math.abs(delta)}</em>` : ''}</span>
-      ${L.need ? `<span class="tk-odds">ROLL ${L.need}+ TO WIN &middot; ${(11 - L.need) * 10}%</span>` : ''}`;
+      <span class="tk-sub">${kid ? 'FAMILY' : 'HOUSEHOLD'} INCOME <b>~${money(dollars(d))}</b>/YR &middot; AGE <b>${L.over ? 55 : L.age}</b></span>`;
   }
   function hud() {
-    $('hud').hidden = !L;
-    if (!L) return;
-    $('hAge').textContent = L.over ? '55+' : L.age;
-    $('hPct').textContent = (L.age < 18 ? 'FAMILY ' : '') + '~' + money(dollars(D.dec(L.lp))) + '/YR';
-    $('tag').textContent = L.over ? 'EPILOGUE' : L.age ? 'AGE ' + L.age : 'BIRTH';
+    $('tag').textContent = !L ? 'USA' : L.over ? 'EPILOGUE' : L.age ? 'AGE ' + L.age : 'BIRTH';
   }
   function card(c, title) {
     return `<div class="card"><h3>${title || 'WHAT THE DATA SAYS'}</h3><p>${c.text}</p>${c.src && c.src.length ? `<p class="src">${srcLinks(c.src)}</p>` : ''}</div>`;
   }
+  const whyHTML = (cards, id) => cards && cards.length ? `<button class="why" id="${id}Btn" aria-expanded="false" aria-controls="${id}Cards">WHY?</button><div class="cards" id="${id}Cards" hidden>${cards.join('')}</div>` : '';
+  function wireWhy(id) {
+    const wb = $(id + 'Btn');
+    if (wb) wb.onclick = () => { const c = $(id + 'Cards'); c.hidden = !c.hidden; wb.setAttribute('aria-expanded', String(!c.hidden)); wb.textContent = c.hidden ? 'WHY?' : 'HIDE'; };
+  }
   function say(html, cards) {
-    const why = cards && cards.length ? `<button class="why" id="whyBtn" aria-expanded="false">WHY?</button><div class="cards" id="cards" hidden>${cards.join('')}</div>` : '';
-    $('dialog').innerHTML = html + why;
-    const wb = $('whyBtn');
-    if (wb) wb.onclick = () => { const c = $('cards'); c.hidden = !c.hidden; wb.setAttribute('aria-expanded', String(!c.hidden)); wb.textContent = c.hidden ? 'WHY?' : 'HIDE'; };
+    $('dialog').innerHTML = html + whyHTML(cards, 'why');
+    wireWhy('why');
+  }
+  // Life events have no roll, so they arrive as a popup over the game.
+  function popup(html, cards, label, fn) {
+    const m = $('modal');
+    m.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="mTitle">${html}${whyHTML(cards, 'mwhy')}
+      <button class="btn primary" id="mGo"><span class="cur">&#9654;</span><span>${label}</span></button></div>`;
+    wireWhy('mwhy');
+    m.hidden = false; document.body.classList.add('locked');
+    $('mGo').onclick = () => { m.hidden = true; m.innerHTML = ''; document.body.classList.remove('locked'); fn(); };
+    $('mGo').focus({ preventScroll: true });
+  }
+  // A fair 1-10 die, rolled when you press the button.
+  function freshDie() {
+    const a = new Uint8Array(1);
+    if (!(window.crypto && crypto.getRandomValues)) return 1 + Math.floor(Math.random() * 10);
+    do crypto.getRandomValues(a); while (a[0] >= 250);
+    return 1 + (a[0] % 10);
   }
   function choices(list) {
     const box = $('choices'); box.innerHTML = '';
@@ -166,8 +182,8 @@
     const d = o.start, mob = DATA.groups[o.race + '_' + o.gender].mob[fifth(d)];
     const intro = L.child ? `<p>Your child is born. They start where you ended up.</p>` : '';
     say(`${intro}<p>You're a ${D.RACES[o.race]} ${o.gender === 'f' ? 'girl' : 'boy'}.</p>
-      <p>Your family is in the <b>${ord(d)} income decile</b>, about ${money(dollars(d))} a year.</p>
-      <p class="q">From age 5 to 55 you'll roll a die. Your income sets your odds.</p>`,
+      <p>Your family starts you with <b>${d} life points</b>: the ${ord(d)} income decile, about ${money(dollars(d))} a year.</p>
+      <p class="q">From age 5 to 55 you'll roll a die. Your life points set your odds.</p>`,
       [card({ text: `Of ${who(o.race, o.gender)} born to parents in the ${FIFTHS[fifth(d)]}, ${Math.round(mob[4] * 100)}% ended up in the top fifth as adults, and ${Math.round(mob[0] * 100)}% in the bottom fifth.`, src: ['race'] })]);
     choices([['START LIFE', null, () => nextAge(), true]]);
     window.scrollTo({ top: 0 });
@@ -184,8 +200,8 @@
     let html = `<p class="stage">AGE ${s.age} &middot; ${D.STAGE[s.age].toUpperCase()}</p>`, cards = [];
     if (s.kind === 'odds') {
       L.need = s.need; L.i++;
-      html += `<p>Your odds match your income right now: decile ${s.dec}.</p><p class="q">Roll ${s.need} or higher to win (${s.chance}% chance).</p>`;
-      cards.push(card({ text: `Your chance to win is your income decile minus one, times 10%, but never below ${D.MIN_CH}% or above ${D.MAX_CH}%. It resets at 5, 15, 25, 35, 45 and 55. A win is +${D.WIN}, a loss is ${D.LOSE}, so you need about one win in three just to hold your place. Money works like that: savings, family help and good schools turn bad luck into a setback instead of a fall.` }, 'HOW THE ODDS WORK'));
+      html += `<p>You have ${s.dec} life points, so your odds are set for the next ten years.</p><p class="q">Roll ${s.need} or higher to win (${s.chance}% chance).</p>`;
+      cards.push(card({ text: `Your chance to win is your life points minus one, times 10%, but never below ${D.MIN_CH}% or above ${D.MAX_CH}%. It resets at 5, 15, 25, 35, 45 and 55. A win is +${D.WIN}, a loss is ${D.LOSE}, so you need about one win in three just to hold your place. Money works like that: savings, family help and good schools turn bad luck into a setback instead of a fall.` }, 'HOW THE ODDS WORK'));
     } else if (rolls) {
       html += `<p class="q">Roll ${L.need} or higher to win (${(11 - L.need) * 10}% chance).</p>`;
     }
@@ -203,6 +219,9 @@
     if (s.kind === 'pen') showPenalty(s);
   }
   function doRoll() {
+    const k = steps().slice(0, L.i).filter(x => x.kind === 'roll').length;
+    L.dice[k] = freshDie();
+    L.life = D.simulate({ race: L.race, gender: L.gender, start: L.start }, L.dice);
     const s = steps()[L.i];
     busy = true;
     const show = n => `<div class="rollrow"><div class="die" aria-hidden="true">${n}</div><div><p class="stage">AGE ${s.age}${s.of === 2 ? ` &middot; ROLL ${s.idx + 1} OF 2` : ''}</p><p class="note">Need ${s.need}+</p></div></div>`;
@@ -226,12 +245,15 @@
   }
   function showPenalty(s) {
     L.i++; L.lp = s.lp; hud(); ticker(s.delta); redraw();
-    say(`<p class="stage">AGE ${s.age} &middot; ${s.name} ${s.delta ? s.delta : '-0'}</p><p class="bad">${s.text}</p>
+    $('choices').innerHTML = '';
+    const nx = steps()[L.i], same = nx && nx.age === s.age;
+    popup(`<p class="ev-tag">LIFE EVENT &middot; AGE ${s.age} &middot; NO ROLL</p>
+      <h2 class="ev-name" id="mTitle">${s.name}</h2>
+      <p class="ev-delta">${s.delta ? s.delta : '&minus;0'} <span>LIFE POINT</span></p>
+      <p>${s.text}</p>
       ${s.delta === 0 ? '<p class="note">You were already at the bottom.</p>' : ''}
-      <p class="note">${s.type === 'cost' ? 'Everyone takes this hit.' : s.type === 'girl' ? 'Only girls take this hit.' : 'Only Black, Hispanic and Native players take this hit.'}</p>`, [card(s.card)]);
-    const nx = steps()[L.i];
-    if (nx && nx.age === s.age) choices([['NEXT', null, nextStep, true]]);
-    else choices([[nx ? 'KEEP GOING' : 'SEE HOW IT ENDS', null, nextAge, true]]);
+      <p class="note">${s.type === 'cost' ? 'Everyone takes this hit.' : s.type === 'girl' ? 'Only girls take this hit.' : 'Only Black, Hispanic and Native players take this hit.'}</p>`,
+      [card(s.card)], same ? 'NEXT' : nx ? 'KEEP GOING' : 'SEE HOW IT ENDS', same ? nextStep : nextAge);
   }
 
   // ---------- ending ----------
@@ -239,7 +261,7 @@
     const w = 300, h = 110, pad = 18;
     const x = a => pad + (a / 55) * (w - pad * 2), y = v => h - pad - ((v - 1) / 9) * (h - pad * 2);
     const path = pts => pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.age).toFixed(1)},${y(p.lp).toFixed(1)}`).join(' ');
-    return `<svg viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="Your income decile from birth to 55">
+    return `<svg viewBox="0 0 ${w} ${h}" class="spark" role="img" aria-label="Your life points from birth to 55">
       ${[1, 5, 10].map(v => `<line x1="${pad}" x2="${w - pad}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${pad - 4}" y="${y(v) + 4}" class="lbl" text-anchor="end">${v}</text>`).join('')}
       ${lines.map(([pts, cls]) => `<path d="${path(pts)}" class="${cls}"/>`).join('')}
       ${[0, 18, 35, 55].map(a => `<text x="${x(a)}" y="${h - 3}" class="lbl" text-anchor="middle">${a}</text>`).join('')}
@@ -248,9 +270,9 @@
   function finish() {
     L.over = true; L.need = null; hud(); ticker(0); redraw();
     const fin = L.life.final, [, title, blurb] = D.ending(fin);
-    say(`<p class="stage">AGE 55 &middot; ${title}</p><p>${blurb}</p><p>You finished in the <b>${ord(fin)} decile</b>, about ${money(dollars(fin))} a year. You started in the ${ord(L.start)}.</p>`);
+    say(`<p class="stage">AGE 55 &middot; ${title}</p><p>${blurb}</p><p>You finished with <b>${fin} life points</b> (the ${ord(fin)} income decile), about ${money(dollars(fin))} a year. You started with ${L.start}.</p>`);
     choices([
-      ['PLAY AS YOUR CHILD', `They start where you ended: the ${ord(fin)} decile.`, () => start({ race: L.race, start: fin, child: true }), true],
+      ['PLAY AS YOUR CHILD', `They start with your ${fin} life points.`, () => start({ race: L.race, start: fin, child: true }), true],
       ['DRAW ANOTHER LIFE', null, () => start({})],
       ['CHOOSE YOUR START', 'Pick race, gender and family income.', chooser],
     ]);
@@ -260,7 +282,7 @@
     const privileged = (L.race === 'white' || L.race === 'asian') && L.gender === 'm';
     const altWho = privileged ? { race: 'black', gender: 'f' } : { race: 'white', gender: 'm' };
     const A = D.simulate({ ...o, start: altStart }, L.dice), B = D.simulate({ ...o, ...altWho }, L.dice);
-    const row = (label, life, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${ord(life.start)}</td><td>${ord(life.final)}</td><td>${D.ending(life.final)[1]}</td></tr>`;
+    const row = (label, life, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${life.start}</td><td>${life.final}</td><td>${D.ending(life.final)[1]}</td></tr>`;
     // Game vs real for your group and starting fifth
     const game = D.gameOdds(o, 20000), real = DATA.groups[L.race + '_' + L.gender].mob[fifth(L.start)];
     const bars = FIFTHS.map((f, i) => `<div class="fifth ${i === fifth(fin) ? 'you' : ''}"><span class="fl">${f.replace(' fifth', '').toUpperCase()}</span>
@@ -270,14 +292,14 @@
       <div class="panel">
         <h2>YOUR LIFE</h2>
         ${sparkline([[A.hist, 'line alt'], [B.hist, 'line alt2'], [L.life.hist, 'line']])}
-        <p class="note"><span class="key k1"></span>You <span class="key k2"></span>Born in the ${ord(altStart)} decile <span class="key k3"></span>Born a ${who(altWho.race, altWho.gender).replace(/s$/, '')}</p>
+        <p class="note"><span class="key k1"></span>You <span class="key k2"></span>Born with ${altStart} points <span class="key k3"></span>Born a ${who(altWho.race, altWho.gender).replace(/s$/, '')}</p>
       </div>
       <div class="panel">
         <h2>SAME ROLLS. DIFFERENT START.</h2>
-        <p>We replayed your life with the exact same dice. Only the start changed.</p>
-        <div class="scroll"><table class="odds"><thead><tr><th></th><th>START</th><th>AGE 55</th><th>ENDING</th></tr></thead><tbody>
+        <p>We replayed your life with the exact dice you rolled. Only the start changed. Numbers are life points.</p>
+        <div class="scroll"><table class="odds"><thead><tr><th></th><th>START</th><th>AT 55</th><th>ENDING</th></tr></thead><tbody>
           ${row('You', L.life, 'you')}
-          ${row(`Born in the ${ord(altStart)} decile`, A)}
+          ${row(`Born with ${altStart} points`, A)}
           ${row(`Born a ${who(altWho.race, altWho.gender).replace(/s$/, '')}`, B)}
         </tbody></table></div>
       </div>
@@ -295,7 +317,7 @@
     return `<div class="panel" id="sources">
       <h2>WHERE THE NUMBERS COME FROM</h2>
       <ul class="sources">${Object.values(D.SRC).map(([label, url]) => `<li><a href="${url}" target="_blank" rel="noopener">${label}</a></li>`).join('')}</ul>
-      <p class="sources">How the game works: you start at your parents' income decile. At each stop you roll a 1&ndash;10 die. Your chance to win is your decile minus one, times 10%, between ${D.MIN_CH}% and ${D.MAX_CH}%, reset at 5, 15, 25, 35, 45 and 55. Win +${D.WIN}, lose ${D.LOSE}. Everyone pays a Cost of Living hit at 18, 33 and 48. Girls take a hit at 25, 35 and 45; Black, Hispanic and Native players at 30, 40 and 50. We tuned these rules so that, across many lives, the game lands close to the real mobility data. Gaps by race reflect neighborhoods, schools, discrimination and family wealth, not race itself.</p>
+      <p class="sources">How the game works: you start with life points equal to your parents' income decile (1&ndash;10). At each stop you roll a fair 1&ndash;10 die. Your chance to win is your life points minus one, times 10%, between ${D.MIN_CH}% and ${D.MAX_CH}%, reset at 5, 15, 25, 35, 45 and 55. Win +${D.WIN}, lose ${D.LOSE}. Everyone pays a Cost of Living hit at 18, 33 and 48. Girls take a hit at 25, 35 and 45; Black, Hispanic and Native players at 30, 40 and 50. We tuned these rules so that, across many lives, the game lands close to the real mobility data. Gaps by race reflect neighborhoods, schools, discrimination and family wealth, not race itself.</p>
     </div>`;
   }
   function chooser() {
@@ -306,7 +328,7 @@
       <div class="panel">
         <label class="f" for="cRace">RACE / ETHNICITY<select id="cRace">${Object.entries(D.RACES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
         <label class="f" for="cGender">GENDER<select id="cGender"><option value="f">Girl</option><option value="m">Boy</option></select></label>
-        <label class="f" for="cPar">PARENTS' INCOME DECILE<select id="cPar">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i === 4 ? 'selected' : ''}>${i + 1}${i === 0 ? ' (bottom 10%)' : i === 9 ? ' (top 10%)' : ''} &middot; ~${money(dollars(i + 1))}</option>`).join('')}</select></label>
+        <label class="f" for="cPar">PARENTS' INCOME = STARTING LIFE POINTS<select id="cPar">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i === 4 ? 'selected' : ''}>${i + 1} point${i ? 's' : ''}${i === 0 ? ' (bottom 10%)' : i === 9 ? ' (top 10%)' : ''} &middot; ~${money(dollars(i + 1))}</option>`).join('')}</select></label>
       </div>`;
     const b = document.createElement('button');
     b.className = 'btn primary'; b.innerHTML = '<span class="cur">&#9654;</span><span>START THIS LIFE</span>';
@@ -316,7 +338,7 @@
   function titleScreen() {
     L = null; hud(); ticker(0);
     say(`<p>You don't choose where you're born. Draw a random American life and roll your way from age 5 to 55.</p>
-      <p class="q">Your family's income sets your odds. Win a roll: +2. Lose: &minus;1. Tap WHY? to see the real data.</p>`);
+      <p class="q">You start with life points equal to your family's income decile, and your points set your odds. Win a roll: +2. Lose: &minus;1. Tap WHY? to see the real data.</p>`);
     choices([
       ['DRAW A LIFE', 'Random start, weighted like real US births.', () => start({}), true],
       ['CHOOSE YOUR START', 'Pick race, gender and family income.', chooser],
