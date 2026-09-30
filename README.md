@@ -25,7 +25,7 @@ Draw a random American life (or choose race, gender and parents' income decile) 
 
 5. Endings by final points: 1–20 Stuck, 21–40 Getting by, 41–80 Stable, 81–100 Thriving.
 
-The top bar shows life points out of 100 with family income (before 18) or your own earnings (from 18) and your age underneath.
+The top bar shows life points out of 100 and your age. Earnings are shown only at 20, 30, 40, 50 and 55. Dollar amounts map life points onto the 5th–95th percentile (10 points or less = 5th, 100 points = 95th), so the game never shows extreme top incomes.
 
 At the end: your points over your life, **the same dice replayed** with a different start (5 or 95) and as a different player (a white boy, or a Black boy if your group takes no hit), the **game vs real data** for your group and parents' fifth, and **play as your child** (they start where you ended).
 

@@ -99,7 +99,10 @@
   function loop() { frame++; if (frame % 2 === 0) { g.clearRect(0, 0, W, H); scene(); } if (!reduced) requestAnimationFrame(loop); }
 
   // ---------- UI pieces ----------
-  const incomeAt = (v, kid) => kid ? dollars(v) : D.earnings(v);
+  // Dollar amounts: life points map to the 5th-95th percentile (10 points = 5th, 100 points = 95th).
+  const pctOf = v => Math.min(95, Math.max(5, v - 5));
+  const famIncome = v => dollars(pctOf(v)), pay = v => D.earnings(pctOf(v));
+  const payLine = s => s.age % 10 === 0 ? `<p class="earn">At ${s.age} you earn about <b>${money(pay(s.lp))} a year</b>.</p>` : '';
   function barHTML(v) {
     return `<span class="lpbar" role="img" aria-label="${v} of 100 life points"><i style="width:${v}%"></i></span>`;
   }
@@ -107,10 +110,10 @@
     const t = $('ticker');
     if (!L) { t.hidden = true; return; }
     t.hidden = false;
-    const v = L.lp, kid = L.age < 18 && !L.over;
+    const v = L.lp;
     t.innerHTML = `<span class="tk-idx">LIFE POINTS</span>${barHTML(v)}
       <span class="tk-pts"><b>${v}</b>/100<em class="dl ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}" aria-live="polite">${delta ? (delta > 0 ? '+' : '&minus;') + Math.abs(delta) : ''}</em></span>
-      <span class="tk-sub">${kid ? 'FAMILY INCOME' : 'YOUR EARNINGS'} <b>~${money(incomeAt(v, kid))}</b>/YR &middot; AGE <b>${L.over ? 55 : L.age}</b></span>`;
+      <span class="tk-sub">AGE <b>${L.over ? 55 : L.age}</b></span>`;
   }
   function hud() {
     $('tag').textContent = !L ? 'USA' : L.over ? 'EPILOGUE' : L.age ? 'AGE ' + L.age : 'BIRTH';
@@ -196,9 +199,9 @@
     const v = o.start, k = o.race + '_' + o.gender, hit = D.GROUP[k];
     const intro = L.child ? `<p>Your child is born. They start where you ended up.</p>` : '';
     say(`${intro}<p>You're a ${D.RACES[o.race]} ${o.gender === 'f' ? 'girl' : 'boy'}.</p>
-      <p>Your family starts you with <b>${v} life points</b>: they earn more than ${v - 1}% of families, about ${money(dollars(v))} a year.</p>
+      <p>Your family starts you with <b>${v} life points</b>. Your family earns about ${money(famIncome(v))} a year.</p>
       <p class="q">From 5 to 55 you'll roll a die. Everyone rolls the same die. ${hit ? `As a ${D.RACES[o.race]} ${o.gender === 'f' ? 'woman' : 'man'}, you'll also take a &minus;${hit} hit at 30, 40 and 50.` : 'Your group takes no extra hits.'}</p>`,
-      [card({ text: `Life points start at your parents' household income rank, from 1 to 100. As an adult they track your own earnings rank. Everyone rolls the same die: ${zonesPlain()}. Everyone pays a Cost of Living hit of &minus;${D.COST_HIT} at 18, 33 and 48.` }, 'HOW IT WORKS'), groupCard(o.race, o.gender)]);
+      [card({ text: `Life points start at your parents' household income rank, from 1 to 100. As an adult they track your own earnings rank. You'll see what you earn at 20, 30, 40, 50 and 55. Everyone rolls the same die: ${zonesPlain()}. Everyone pays a Cost of Living hit of &minus;${D.COST_HIT} at 18, 33 and 48.` }, 'HOW IT WORKS'), groupCard(o.race, o.gender)]);
     choices([['START LIFE', null, () => nextAge(), true]]);
     window.scrollTo({ top: 0 });
   }
@@ -240,7 +243,7 @@
       say(`<div class="rollrow"><div class="die ${s.zone}" role="img" aria-label="You rolled ${s.die}">${s.die}</div>
         <div><p class="stage">${label}</p><p class="delta ${tone}">${word}${amt}</p></div></div>
         ${zonesHTML(s.die)}
-        <p class="${tone === 'dim' ? '' : tone}">${s.text}</p>${s.zone !== 'stay' && s.delta !== (s.zone === 'win' ? D.WIN : D.LOSE) ? `<p class="note">${s.zone === 'win' ? 'You hit the top: 100 points.' : 'You hit the floor: 1 point.'}</p>` : ''}`);
+        <p class="${tone === 'dim' ? '' : tone}">${s.text}</p>${s.zone !== 'stay' && s.delta !== (s.zone === 'win' ? D.WIN : D.LOSE) ? `<p class="note">${s.zone === 'win' ? 'You hit the top: 100 points.' : 'You hit the floor: 1 point.'}</p>` : ''}${steps()[L.i] && steps()[L.i].age === s.age ? '' : payLine(s)}`);
       const nx = steps()[L.i];
       if (nx && nx.age === s.age && nx.kind === 'roll') choices([['ROLL 2 OF 2', null, doRoll, true]]);
       else if (nx && nx.age === s.age) choices([['NEXT', null, nextStep, true]]);
@@ -265,7 +268,7 @@
       <p class="ev-delta">${s.delta ? '&minus;' + Math.abs(s.delta) : '&minus;0'} <span>LIFE POINTS</span></p>
       <p>${s.text}</p>
       ${s.delta === 0 ? '<p class="note">You were already at the floor.</p>' : ''}
-      <p class="note">${whoNote}</p>`,
+      <p class="note">${whoNote}</p>${same ? '' : payLine(s)}`,
       s.type === 'cost' ? [card(s.card)] : [card(s.card), groupCard(L.race, L.gender)],
       same ? 'NEXT' : nx ? 'KEEP GOING' : 'SEE HOW IT ENDS', same ? nextStep : nextAge);
   }
@@ -284,7 +287,7 @@
   function finish() {
     L.over = true; hud(); ticker(0); redraw();
     const fin = L.life.final, [, title, blurb] = D.ending(fin);
-    say(`<p class="stage">AGE 55 &middot; ${title}</p><p>${blurb}</p><p>You finished with <b>${fin} life points</b>: you earn more than ${fin - 1}% of people, about ${money(D.earnings(fin))} a year. You started with ${L.start}.</p>`);
+    say(`<p class="stage">AGE 55 &middot; ${title}</p><p>${blurb}</p><p>You finished with <b>${fin} life point${fin === 1 ? '' : 's'}</b>. At 55 you earn about <b>${money(pay(fin))} a year</b>. You started with ${L.start}.</p>`);
     choices([
       ['PLAY AS YOUR CHILD', `They start with your ${fin} life points.`, () => start({ race: L.race, start: fin, child: true }), true],
       ['DRAW ANOTHER LIFE', null, () => start({})],
@@ -344,7 +347,7 @@
       <div class="panel">
         <label class="f" for="cRace">RACE / ETHNICITY<select id="cRace">${Object.entries(D.RACES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></label>
         <label class="f" for="cGender">GENDER<select id="cGender"><option value="f">Girl</option><option value="m">Boy</option></select></label>
-        <label class="f" for="cPar">PARENTS' INCOME = STARTING LIFE POINTS<select id="cPar">${[5, 15, 25, 35, 45, 55, 65, 75, 85, 95].map(v => `<option value="${v}" ${v === 45 ? 'selected' : ''}>${v} points${v === 5 ? ' (bottom 10%)' : v === 95 ? ' (top 10%)' : ''} &middot; ~${money(dollars(v))}</option>`).join('')}</select></label>
+        <label class="f" for="cPar">PARENTS' INCOME = STARTING LIFE POINTS<select id="cPar">${[5, 15, 25, 35, 45, 55, 65, 75, 85, 95].map(v => `<option value="${v}" ${v === 45 ? 'selected' : ''}>${v} points${v === 5 ? ' (bottom 10%)' : v === 95 ? ' (top 10%)' : ''} &middot; ~${money(famIncome(v))}</option>`).join('')}</select></label>
       </div>`;
     const b = document.createElement('button');
     b.className = 'btn primary'; b.innerHTML = '<span class="cur">&#9654;</span><span>START THIS LIFE</span>';
